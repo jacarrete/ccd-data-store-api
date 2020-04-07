@@ -3,6 +3,16 @@ package uk.gov.hmcts.ccd.domain.service.createevent;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+import uk.gov.hmcts.ccd.ApplicationParams;
+import uk.gov.hmcts.ccd.data.SecurityUtils;
 import uk.gov.hmcts.ccd.data.casedetails.CachedCaseDetailsRepository;
 import uk.gov.hmcts.ccd.data.casedetails.CaseAuditEventRepository;
 import uk.gov.hmcts.ccd.data.casedetails.CaseDetailsRepository;
@@ -15,6 +25,7 @@ import uk.gov.hmcts.ccd.domain.model.definition.CaseDetails;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseEvent;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseState;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseType;
+import uk.gov.hmcts.ccd.domain.model.search.DocumentMetadata;
 import uk.gov.hmcts.ccd.domain.model.std.AuditEvent;
 import uk.gov.hmcts.ccd.domain.model.std.CaseDataContent;
 import uk.gov.hmcts.ccd.domain.model.std.Event;
@@ -30,16 +41,24 @@ import uk.gov.hmcts.ccd.domain.service.stdapi.CallbackInvoker;
 import uk.gov.hmcts.ccd.domain.service.validate.ValidateCaseFieldsOperation;
 import uk.gov.hmcts.ccd.domain.types.sanitiser.CaseSanitiser;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
+import uk.gov.hmcts.ccd.endpoint.exceptions.CaseConcurrencyException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ResourceNotFoundException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ValidationException;
 import uk.gov.hmcts.ccd.infrastructure.user.UserAuthorisation;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -49,12 +68,20 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import uk.gov.hmcts.ccd.v2.V2;
+import uk.gov.hmcts.ccd.v2.external.domain.CaseDocument;
 
 @Service
 public class CreateCaseEventService {
 
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final Logger LOG = LoggerFactory.getLogger(CreateCaseEventService.class);
 
+    @Inject
+    private HttpServletRequest request;
+    private final RestTemplate restTemplate;
+    private final ApplicationParams applicationParams;
+    private final SecurityUtils securityUtils;
+    private static final ObjectMapper mapper = new ObjectMapper();
     private final UserRepository userRepository;
     private final CaseDetailsRepository caseDetailsRepository;
     private final CaseDefinitionRepository caseDefinitionRepository;
@@ -71,6 +98,10 @@ public class CreateCaseEventService {
     private final ValidateCaseFieldsOperation validateCaseFieldsOperation;
     private final UserAuthorisation userAuthorisation;
     private final Clock clock;
+    public static final String DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE = "document_binary_url";
+    public static final String DOCUMENT_CASE_FIELD_URL_ATTRIBUTE = "document_url";
+    public static final String CONTENT_TYPE = "content-type";
+    public static final String DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION = "The documents have been altered outside the create case transaction";
 
     @Inject
     public CreateCaseEventService(@Qualifier(CachedUserRepository.QUALIFIER) final UserRepository userRepository,
@@ -88,7 +119,10 @@ public class CreateCaseEventService {
                                   final SecurityClassificationService securityClassificationService,
                                   final ValidateCaseFieldsOperation validateCaseFieldsOperation,
                                   final UserAuthorisation userAuthorisation,
-                                  @Qualifier("utcClock") final Clock clock) {
+                                  @Qualifier("utcClock") final Clock clock,
+                                  @Qualifier("restTemplate") final RestTemplate restTemplate,
+                                  ApplicationParams applicationParams,
+                                  SecurityUtils securityUtils) {
         this.userRepository = userRepository;
         this.caseDetailsRepository = caseDetailsRepository;
         this.caseDefinitionRepository = caseDefinitionRepository;
@@ -106,6 +140,9 @@ public class CreateCaseEventService {
         this.userAuthorisation = userAuthorisation;
         this.clock = clock;
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        this.restTemplate = restTemplate;
+        this.applicationParams = applicationParams;
+        this.securityUtils = securityUtils;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -127,14 +164,72 @@ public class CreateCaseEventService {
             caseType,
             content.getIgnoreWarning());
 
+
         final Optional<String>
             newState = aboutToSubmitCallbackResponse.getState();
 
         validateCaseFieldsOperation.validateData(caseDetails.getData(), caseType);
         LocalDateTime timeNow = now();
+
+        ///  all changes Start from  here
+        DocumentMetadata documentMetadata = null;
+
+        boolean isApiVersion21 = request.getHeader(CONTENT_TYPE) != null
+            && request.getHeader(CONTENT_TYPE).equals(V2.MediaType.CREATE_EVENT_2_1);
+
+        if (isApiVersion21) {
+            documentMetadata = DocumentMetadata.builder()
+                .caseId(caseDetails.getReferenceAsString())
+                .jurisdictionId(caseDetails.getJurisdiction())
+                .caseTypeId(caseDetails.getCaseTypeId())
+                .documents(new ArrayList<>())
+                .build();
+
+            if (content.getData() != null) {
+
+                Set<String> updatedDocumentSet = new HashSet<>();
+
+                // to remove hashcode before compute delta
+                caseSanitiser.extractDocumentFields(documentMetadata, content.getData(),updatedDocumentSet);
+
+                //to sanitize data to prepare the Document object to send  attached doc to case api
+                final Set<String> filterDocumentSet = caseSanitiser.sanitizeForAttachedDocsToCase(caseDetailsBefore, content.getData());
+
+                // to filter the DocumentMetaData based on sanitisedDataToAttachDoc
+                List<CaseDocument> caseDocumentList = documentMetadata.getDocuments().stream()
+                    .filter(document -> filterDocumentSet.contains(document.getId()))
+                    .collect(Collectors.toList());
+                documentMetadata.setDocuments(caseDocumentList);
+
+
+            }
+        }
+
+
         final CaseDetails savedCaseDetails = saveCaseDetails(caseDetailsBefore, caseDetails, eventTrigger, newState, timeNow);
         saveAuditEventForCaseDetails(aboutToSubmitCallbackResponse, content.getEvent(), eventTrigger, savedCaseDetails, caseType, timeNow);
 
+        // Case Document API Call to attach the case with respective document
+        if (isApiVersion21) {
+            HttpEntity<DocumentMetadata> requestEntity = new HttpEntity<>(documentMetadata, securityUtils.authorizationHeaders());
+            restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
+
+            try {
+                if (!documentMetadata.getDocuments().isEmpty()) {
+                    ResponseEntity<Boolean> result = restTemplate
+                        .exchange(applicationParams.getCaseDocumentAmApiHost().concat(applicationParams.getAttachDocumentPath()),
+                            HttpMethod.PATCH, requestEntity, Boolean.class);
+
+                    if (!result.getStatusCode().equals(HttpStatus.OK) || result.getBody() == null || result.getBody().equals(false)) {
+                        LOG.error(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
+                        throw new CaseConcurrencyException(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
+                    }
+                }
+            } catch (Exception e) {
+                LOG.error(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
+                throw new CaseConcurrencyException(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
+            }
+        }
         return CreateCaseEventResult.caseEventWith()
             .caseDetailsBefore(caseDetailsBefore)
             .savedCaseDetails(savedCaseDetails)
@@ -192,8 +287,11 @@ public class CreateCaseEventService {
                                                  final CaseDetails caseDetails,
                                                  final CaseEvent caseEvent,
                                                  final CaseType caseType) {
+
         if (null != data) {
+
             final Map<String, JsonNode> sanitisedData = caseSanitiser.sanitise(caseType, data);
+
             for (Map.Entry<String, JsonNode> field : sanitisedData.entrySet()) {
                 caseDetails.getData().put(field.getKey(), field.getValue());
             }
@@ -234,4 +332,7 @@ public class CreateCaseEventService {
 
         caseAuditEventRepository.set(auditEvent);
     }
+
+
+
 }

@@ -218,6 +218,7 @@ dependencies {
 
     // CVE-2019-12086 - force update of jackson-databind - remove when dependencies move off <2.9.9
     compile "com.fasterxml.jackson.core:jackson-databind:2.10.0"
+    compile group: 'org.springframework.hateoas', name: 'spring-hateoas', version: '1.0.2.RELEASE'
 
     // FIXME 0.6 doesn't support jsonb; 0.7 doesn't work on Windows
 //    runtime group: 'com.impossibl.pgjdbc-ng', name: 'pgjdbc-ng', version: '0.6'
