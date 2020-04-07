@@ -42,6 +42,7 @@ import uk.gov.hmcts.ccd.domain.service.validate.ValidateCaseFieldsOperation;
 import uk.gov.hmcts.ccd.domain.types.sanitiser.CaseSanitiser;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.CaseConcurrencyException;
+import uk.gov.hmcts.ccd.endpoint.exceptions.DataParsingException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ResourceNotFoundException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ValidationException;
 import uk.gov.hmcts.ccd.infrastructure.user.UserAuthorisation;
@@ -98,8 +99,7 @@ public class CreateCaseEventService {
     private final ValidateCaseFieldsOperation validateCaseFieldsOperation;
     private final UserAuthorisation userAuthorisation;
     private final Clock clock;
-    public static final String DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE = "document_binary_url";
-    public static final String DOCUMENT_CASE_FIELD_URL_ATTRIBUTE = "document_url";
+    public static final String CASE_DATA_PARSING_EXCEPTION = "Exception while extracting the document fields from Case payload";
     public static final String CONTENT_TYPE = "content-type";
     public static final String DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION = "The documents have been altered outside the create case transaction";
 
@@ -158,6 +158,35 @@ public class CreateCaseEventService {
 
         validatePreState(caseDetails, eventTrigger);
         mergeUpdatedFieldsToCaseDetails(content.getData(), caseDetails, eventTrigger, caseType);
+
+        // remove hashcode before Callback Service
+
+        boolean isApiVersion21 = request.getHeader(CONTENT_TYPE) != null
+            && request.getHeader(CONTENT_TYPE).equals(V2.MediaType.CREATE_EVENT_2_1);
+
+        Set<String> documentSetBeforeCallback = null;
+        Set<String> documentAfterCallback = null;
+        DocumentMetadata documentMetadata = null;
+
+        if (isApiVersion21) {
+            try {
+                LOG.debug("Updating  case using Version 2.1 of case create API");
+                documentSetBeforeCallback = new HashSet<>();
+                documentMetadata = DocumentMetadata.builder()
+                    .caseId(caseDetails.getReferenceAsString())
+                    .jurisdictionId(caseDetails.getJurisdiction())
+                    .caseTypeId(caseDetails.getCaseTypeId())
+                    .documents(new ArrayList<>())
+                    .build();
+
+                caseSanitiser.extractDocumentFields(documentMetadata, caseDetails.getData(), documentSetBeforeCallback);
+            }
+            catch (Exception e) {
+                LOG.error(CASE_DATA_PARSING_EXCEPTION);
+                throw new DataParsingException(CASE_DATA_PARSING_EXCEPTION);
+            }
+        }
+
         AboutToSubmitCallbackResponse aboutToSubmitCallbackResponse = callbackInvoker.invokeAboutToSubmitCallback(eventTrigger,
             caseDetailsBefore,
             caseDetails,
@@ -172,28 +201,18 @@ public class CreateCaseEventService {
         LocalDateTime timeNow = now();
 
         ///  all changes Start from  here
-        DocumentMetadata documentMetadata = null;
-
-        boolean isApiVersion21 = request.getHeader(CONTENT_TYPE) != null
-            && request.getHeader(CONTENT_TYPE).equals(V2.MediaType.CREATE_EVENT_2_1);
 
         if (isApiVersion21) {
-            documentMetadata = DocumentMetadata.builder()
-                .caseId(caseDetails.getReferenceAsString())
-                .jurisdictionId(caseDetails.getJurisdiction())
-                .caseTypeId(caseDetails.getCaseTypeId())
-                .documents(new ArrayList<>())
-                .build();
 
-            if (content.getData() != null) {
-
-                Set<String> updatedDocumentSet = new HashSet<>();
-
+                documentAfterCallback = new HashSet<>();
                 // to remove hashcode before compute delta
-                caseSanitiser.extractDocumentFields(documentMetadata, content.getData(),updatedDocumentSet);
+                caseSanitiser.extractDocumentFields(documentMetadata, caseDetails.getData(),documentAfterCallback);
 
-                //to sanitize data to prepare the Document object to send  attached doc to case api
-                final Set<String> filterDocumentSet = caseSanitiser.sanitizeForAttachedDocsToCase(caseDetailsBefore, content.getData());
+               //filter model based on callback response
+               filterDocumentFields(documentMetadata, documentSetBeforeCallback, documentAfterCallback);
+
+                //to sanitize data to prepare the Document object to send  attached doc case api
+                final Set<String> filterDocumentSet = caseSanitiser.sanitizeForAttachedDocsToCase(caseDetailsBefore, caseDetails.getData());
 
                 // to filter the DocumentMetaData based on sanitisedDataToAttachDoc
                 List<CaseDocument> caseDocumentList = documentMetadata.getDocuments().stream()
@@ -201,8 +220,6 @@ public class CreateCaseEventService {
                     .collect(Collectors.toList());
                 documentMetadata.setDocuments(caseDocumentList);
 
-
-            }
         }
 
 
@@ -333,6 +350,36 @@ public class CreateCaseEventService {
         caseAuditEventRepository.set(auditEvent);
     }
 
+    private void filterDocumentFields(DocumentMetadata documentMetadata, Set<String> documentSetBeforeCallback, Set<String> documentSetAfterCallback) {
+        try {
+            //The below change is STRICTLY for LOCAL testing purpose. It needs to be removed in the PR environment
+            documentSetAfterCallback.addAll(documentSetBeforeCallback);
+            //PLEASE REMOVE ABOVE line in PR environment
 
+
+            //find documents which are intersection of Before and after callback
+            Set<String> filteredDocumentSet = documentSetAfterCallback.stream()
+                .filter(documentSetBeforeCallback::contains)
+                .collect(Collectors.toSet());
+
+            //Add the intersection to aftercallback list. Now, afterCallbackList will have the documents from
+            //Callback response
+            // + original documents which have not been removed by the callback
+            // + Any new documents which are added by callback response
+            //This code should drop any documents which were removed by the callback
+            documentSetAfterCallback.addAll(filteredDocumentSet);
+
+            //The following code will filter the documents based on above prepared Set.
+            List<CaseDocument> caseDocumentList = documentMetadata.getDocuments()
+                .stream()
+                .filter(document -> documentSetAfterCallback.contains(document.getId()))
+                .collect(Collectors.toList());
+            documentMetadata.setDocuments(caseDocumentList);
+        } catch (Exception e) {
+            LOG.error("Exception while filtering the document fields.");
+            throw new DataParsingException("Exception while filtering the document fields.");
+        }
+
+    }
 
 }
