@@ -163,7 +163,7 @@ class SubmitCaseTransaction {
                             dmd.getDocuments()
                                     .add(CaseDocument.builder().id(documentId)
                                             .hashToken(jn.get(HASH_CODE_STRING).asText())
-                                            .permissions(Collections.singletonList(Permission.CREATE)).build());
+                                            .build());
                             if (jn instanceof ObjectNode) {
                                 ((ObjectNode) jn).remove(HASH_CODE_STRING);
                             }
@@ -279,7 +279,6 @@ class SubmitCaseTransaction {
                                                                 .builder()
                                                                 .id(documentId)
                                                                 .hashToken(jsonNode.get(HASH_CODE_STRING).asText())
-                                                                .permissions(Collections.singletonList(Permission.CREATE))
                                                                 .build());
                         if (jsonNode instanceof ObjectNode) {
                             ((ObjectNode) jsonNode).remove(HASH_CODE_STRING);

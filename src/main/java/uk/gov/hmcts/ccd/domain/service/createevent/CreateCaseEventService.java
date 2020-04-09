@@ -164,6 +164,7 @@ public class CreateCaseEventService {
                //filter DocumentMetaData Object based on callback response
                caseDocumentAttachOperation.filterDocumentFields();
 
+
                 //sanitize data to prepare the Document object to be send to case document am api
                 final Set<String> filterDocumentSet = caseDocumentAttachOperation.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore, caseDetails.getData());
 

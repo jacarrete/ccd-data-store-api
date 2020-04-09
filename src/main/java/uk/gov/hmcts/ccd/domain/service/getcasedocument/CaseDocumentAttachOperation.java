@@ -20,7 +20,7 @@ import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.CaseConcurrencyException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.DataParsingException;
 import uk.gov.hmcts.ccd.v2.external.domain.CaseDocument;
-import java.util.ArrayList;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -110,7 +110,7 @@ public class CaseDocumentAttachOperation {
             //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
             //This quick check will reduce the processing time as most of filtering will be done at top level.
             //****** Every document should have hashcode, else throw error
-            if (jsonNode != null && isDocumentField(jsonNode)) {
+            if (jsonNode != null && isDocumentField(jsonNode))  {
                 if (jsonNode.get(HASH_CODE_STRING) == null) {
                     throw new BadRequestException("The document does not has the hashcode");
                 }
@@ -210,7 +210,7 @@ public class CaseDocumentAttachOperation {
 
         caseData.forEach((key, value) -> {
 
-            if ((value.findValue(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null || value.findValue(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) != null) && caseDetails.getData().containsKey(key)) {
+            if (caseDetails.getData().containsKey(key) && (value.findValue(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null || value.findValue(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) != null)) {
                 if(!value.equals(caseDetails.getData().get(key)))
                 {
                     documentsDifference.put(key,value);
@@ -219,25 +219,26 @@ public class CaseDocumentAttachOperation {
                 documentsDifference.put(key,value);
             }
         });
-        selectDocument(documentsDifference,filterDocumentSet);
+        findDocumenstId(documentsDifference,filterDocumentSet);
         return filterDocumentSet;
     }
-    private void selectDocument(Map<String, JsonNode> sanitisedDataToAttachDoc, Set<String> filterDocumentSet) {
+    private void findDocumenstId(Map<String, JsonNode> sanitisedDataToAttachDoc, Set<String> filterDocumentSet) {
 
-        sanitisedDataToAttachDoc.forEach((field, jsonNodeValue) -> {
-            if(jsonNodeValue !=null && (jsonNodeValue.findValue(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE )!= null || jsonNodeValue.findValue(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null)){
+        sanitisedDataToAttachDoc.forEach((field, jsonNode) -> {
+            //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
+            //This quick check will reduce the processing time as most of filtering will be done at top level.
+            //****** Every document should have hashcode, else throw error
+            if (jsonNode != null && isDocumentField(jsonNode)) {
+                String documentId = extractDocumentId(jsonNode);
+                filterDocumentSet.add(documentId);
 
-                JsonNode documentBinaryField = jsonNodeValue.findValue(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE);
-                if (documentBinaryField != null) {
-                    filterDocumentSet.add(documentBinaryField.asText().substring(documentBinaryField.asText().length() - 43, documentBinaryField.asText().length() - 7));
-
-                } else {
-                    JsonNode documentField = jsonNodeValue.findValue(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE);
-                    filterDocumentSet.add(documentField.asText().substring(documentField.asText().length() - 36));
-                }
+            } else {
+                jsonNode.fields().forEachRemaining
+                    (node -> findDocumenstId(
+                        Collections.singletonMap(node.getKey(), node.getValue()), filterDocumentSet));
             }
-
         });
+
 
 
     }
