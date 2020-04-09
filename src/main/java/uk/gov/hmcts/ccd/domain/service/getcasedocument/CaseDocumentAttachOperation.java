@@ -16,6 +16,7 @@ import uk.gov.hmcts.ccd.ApplicationParams;
 import uk.gov.hmcts.ccd.data.SecurityUtils;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseDetails;
 import uk.gov.hmcts.ccd.domain.model.search.DocumentMetadata;
+import uk.gov.hmcts.ccd.domain.model.std.CaseDataContent;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.CaseConcurrencyException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.DataParsingException;
@@ -59,17 +60,11 @@ public class CaseDocumentAttachOperation {
         this.securityUtils = securityUtils;
     }
 
-    public void  beforeCallbackPrepareDocumentMetaData(CaseDetails caseDetails){
+    public void  beforeCallbackPrepareDocumentMetaData( CaseDataContent contentData){
         try {
             LOG.debug("Updating  case using Version 2.1 of case create API");
             documentSetBeforeCallback = new HashMap<>();
-            documentMetadata = DocumentMetadata.builder()
-                .caseId(caseDetails.getReference().toString())
-                .caseTypeId(caseDetails.getCaseTypeId())
-                .jurisdictionId(caseDetails.getJurisdiction())
-                .documents(new ArrayList<>())
-                .build();
-            extractDocumentFieldsForUpdateBeforeCallback(documentMetadata,caseDetails.getData(), documentSetBeforeCallback);
+            extractDocumentFieldsBeforeCallback(contentData.getData(), documentSetBeforeCallback);
         }
         catch (Exception e) {
             LOG.error(CASE_DATA_PARSING_EXCEPTION);
@@ -80,8 +75,15 @@ public class CaseDocumentAttachOperation {
     public void  afterCallbackPrepareDocumentMetaData(CaseDetails caseDetails){
         try {
             documentAfterCallback = new HashMap<>();
+            documentMetadata = DocumentMetadata.builder()
+                .caseId(caseDetails.getReference().toString())
+                .caseTypeId(caseDetails.getCaseTypeId())
+                .jurisdictionId(caseDetails.getJurisdiction())
+                .documents(new ArrayList<>())
+                .build();
+
             // to remove hashcode before compute delta
-            extractDocumentFieldsInUpdateCaseAfterCallback(documentMetadata, caseDetails.getData(),documentAfterCallback);
+            extractDocumentFieldsAfterCallback(documentMetadata, caseDetails.getData(),documentAfterCallback);
         }
         catch (Exception e) {
             LOG.error(CASE_DATA_PARSING_EXCEPTION);
@@ -128,39 +130,14 @@ public class CaseDocumentAttachOperation {
             }
         });
     }
-    public void extractDocumentFieldsForUpdateBeforeCallback(DocumentMetadata documentMetadata, Map<String, JsonNode> data, Map<String,String> documentMap) {
-        data.forEach((field, jsonNode) -> {
-            //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
-            //This quick check will reduce the processing time as most of filtering will be done at top level.
-            //****** Every document should have hashcode, else throw error
-            if (jsonNode != null && isDocumentField(jsonNode) && jsonNode.get(HASH_CODE_STRING) != null)  {
-                String documentId = extractDocumentId(jsonNode);
-                documentMetadata.getDocuments().add(CaseDocument
-                    .builder()
-                    .id(documentId)
-                    .hashToken(jsonNode.get(HASH_CODE_STRING).asText())
-                    .build());
-                documentMap.put(documentId,jsonNode.get(HASH_CODE_STRING).asText());
-                if (jsonNode instanceof ObjectNode) {
-                    ((ObjectNode) jsonNode).remove(HASH_CODE_STRING);
-                }
 
-            } else {
-                jsonNode.fields().forEachRemaining
-                    (node -> extractDocumentFieldsForUpdateBeforeCallback(documentMetadata,
-                        Collections.singletonMap(node.getKey(), node.getValue()), documentMap));
-            }
-        });
-    }
     public void extractDocumentFieldsAfterCallback(DocumentMetadata documentMetadata, Map<String, JsonNode> data, Map<String,String> documentMap) {
         data.forEach((field, jsonNode) -> {
             //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
             //This quick check will reduce the processing time as most of filtering will be done at top level.
             //****** Every document should have hashcode, else throw error
-            if (jsonNode != null && isDocumentField(jsonNode)) {
-                if (jsonNode.get(HASH_CODE_STRING) == null) {
-                    throw new BadRequestException("The document does not has the hashcode");
-                }
+            if (jsonNode != null && isDocumentField(jsonNode) && (jsonNode.get(HASH_CODE_STRING) != null)){
+
                 String documentId = extractDocumentId(jsonNode);
                 documentMap.put(documentId,jsonNode.get(HASH_CODE_STRING).asText());
                 documentMetadata.getDocuments().add(CaseDocument
@@ -182,33 +159,7 @@ public class CaseDocumentAttachOperation {
         });
     }
 
-    public void extractDocumentFieldsInUpdateCaseAfterCallback(DocumentMetadata documentMetadata, Map<String, JsonNode> data, Map<String,String> documentMap) {
-        data.forEach((field, jsonNode) -> {
-            //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
-            //This quick check will reduce the processing time as most of filtering will be done at top level.
-            //****** Every document should have hashcode, else throw error
-            if (jsonNode != null && isDocumentField(jsonNode) && jsonNode.get(HASH_CODE_STRING) != null) {
-                String documentId = extractDocumentId(jsonNode);
-                documentMap.put(documentId,jsonNode.get(HASH_CODE_STRING).asText());
-                documentMetadata.getDocuments().add(CaseDocument
-                    .builder()
-                    .id(documentId)
-                    .hashToken(jsonNode.get(HASH_CODE_STRING).asText())
-                    .build());
-
-
-                if (jsonNode instanceof ObjectNode) {
-                    ((ObjectNode) jsonNode).remove(HASH_CODE_STRING);
-                }
-
-            } else {
-                jsonNode.fields().forEachRemaining
-                    (node -> extractDocumentFieldsInUpdateCaseAfterCallback(documentMetadata,
-                        Collections.singletonMap(node.getKey(), node.getValue()), documentMap));
-            }
-        });
-    }
-
+   
 
 
     private boolean isDocumentField(JsonNode jsonNode) {
@@ -231,22 +182,28 @@ public class CaseDocumentAttachOperation {
     private void filterDocumentFields(DocumentMetadata documentMetadata, Map<String,String> documentSetBeforeCallback, Map<String,String> documentSetAfterCallback) {
         try {
             //Below line should be remove before promoting to PR env.
-            documentSetAfterCallback.putAll(documentSetBeforeCallback);
+//            documentSetAfterCallback.putAll(documentSetBeforeCallback);
+          if(documentSetAfterCallback.size()>0) {
+              //find documents which are intersection of Before and after callback
+              Map<String, String> filteredDocumentSet = documentSetAfterCallback.entrySet().stream()
+                  .filter(entry -> documentSetBeforeCallback.containsKey(entry.getKey()) && documentSetBeforeCallback.get(entry.getKey()).equals(entry.getValue()))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-            //find documents which are intersection of Before and after callback
-            Map<String, String> filteredDocumentSet = documentSetAfterCallback.entrySet().stream()
-                .filter(entry->documentSetBeforeCallback.containsKey(entry.getKey()) && documentSetBeforeCallback.get(entry.getKey()).equals(entry.getValue()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
+              //Add the intersection to aftercallback list. Now, afterCallbackList will have the documents from
+              //Callback response
+              // + original documents which have not been removed by the callback
+              // + Any new documents which are added by callback response
+              //This code should drop any documents which were removed by the callback
+              documentSetAfterCallback.putAll(filteredDocumentSet);
+              List<CaseDocument> filterCaseDocument = documentMetadata.getDocuments().stream().filter(caseDocument -> documentSetAfterCallback.containsKey(caseDocument.getId()) && documentSetAfterCallback.get(caseDocument.getId()).equals(caseDocument.getHashToken())).collect(Collectors.toList());
+              documentMetadata.setDocuments(filterCaseDocument);
+          }else{
 
-            //Add the intersection to aftercallback list. Now, afterCallbackList will have the documents from
-            //Callback response
-            // + original documents which have not been removed by the callback
-            // + Any new documents which are added by callback response
-            //This code should drop any documents which were removed by the callback
-            documentSetAfterCallback.putAll(filteredDocumentSet);
-            List<CaseDocument>  filterCaseDocument = documentMetadata.getDocuments().stream().filter(caseDocument->documentSetAfterCallback.containsKey(caseDocument.getId())&& documentSetAfterCallback.get(caseDocument.getId()).equals(caseDocument.getHashToken())).collect(Collectors.toList());
-            documentMetadata.setDocuments(filterCaseDocument);
+              List<CaseDocument> filterCaseDocument = documentMetadata.getDocuments().stream().filter(caseDocument -> documentSetBeforeCallback.containsKey(caseDocument.getId())
+                  && documentSetBeforeCallback.get(caseDocument.getId()).equals(caseDocument.getHashToken())).collect(Collectors.toList());
+              documentMetadata.setDocuments(filterCaseDocument);
+          }
         } catch (Exception e) {
             LOG.error("Exception while filtering the document fields.");
             throw new DataParsingException("Exception while filtering the document fields.");

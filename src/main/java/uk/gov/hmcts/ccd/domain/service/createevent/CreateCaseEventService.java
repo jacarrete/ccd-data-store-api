@@ -131,17 +131,16 @@ public class CreateCaseEventService {
         eventTokenService.validateToken(content.getToken(), uid, caseDetails, eventTrigger, caseType.getJurisdiction(), caseType);
 
         validatePreState(caseDetails, eventTrigger);
-        mergeUpdatedFieldsToCaseDetails(content.getData(), caseDetails, eventTrigger, caseType);
-
-
-       // Logic start from here to attach document with case ID
+        //  content
+        // Logic start from here to attach document with case ID
         boolean isApiVersion21 = request.getHeader(CONTENT_TYPE) != null
             && request.getHeader(CONTENT_TYPE).equals(V2.MediaType.CREATE_EVENT_2_1);
 
         if (isApiVersion21) {
             // before call back
-            caseDocumentAttachOperation.beforeCallbackPrepareDocumentMetaData(caseDetails);
+            caseDocumentAttachOperation.beforeCallbackPrepareDocumentMetaData(content);
         }
+        mergeUpdatedFieldsToCaseDetails(content.getData(), caseDetails, eventTrigger, caseType);
 
         AboutToSubmitCallbackResponse aboutToSubmitCallbackResponse = callbackInvoker.invokeAboutToSubmitCallback(eventTrigger,
             caseDetailsBefore,
