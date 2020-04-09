@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -18,7 +16,6 @@ import uk.gov.hmcts.ccd.domain.model.definition.CaseDetails;
 import uk.gov.hmcts.ccd.domain.model.search.DocumentMetadata;
 import uk.gov.hmcts.ccd.domain.model.std.CaseDataContent;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
-import uk.gov.hmcts.ccd.endpoint.exceptions.CaseConcurrencyException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.DataParsingException;
 import uk.gov.hmcts.ccd.v2.external.domain.CaseDocument;
 
@@ -153,13 +150,13 @@ public class CaseDocumentAttachOperation {
 
             } else {
                 jsonNode.fields().forEachRemaining
-                    (node -> extractDocumentFieldsBeforeCallback(
+                    (node -> extractDocumentFieldsAfterCallback(documentMetadata,
                         Collections.singletonMap(node.getKey(), node.getValue()), documentMap));
             }
         });
     }
 
-   
+
 
 
     private boolean isDocumentField(JsonNode jsonNode) {

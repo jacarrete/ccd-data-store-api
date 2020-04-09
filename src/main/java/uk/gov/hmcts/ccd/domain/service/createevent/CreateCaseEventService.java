@@ -157,6 +157,7 @@ public class CreateCaseEventService {
 
         //Changes start after callback response
         if (isApiVersion21) {
+           // if(aboutToSubmitCallbackResponse.)
                 // to remove hashcode after callback
                caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(caseDetails);
 
