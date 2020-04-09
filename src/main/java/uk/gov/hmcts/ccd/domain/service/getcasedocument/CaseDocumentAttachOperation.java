@@ -43,7 +43,7 @@ public class CaseDocumentAttachOperation {
     public static final String DOCUMENT = "Document";
     public static final String DOCUMENT_CASE_FIELD_URL_ATTRIBUTE = "document_url";
     public static final String DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE = "document_binary_url";
-    public static final String HASH_CODE_STRING = "hashcode";
+    public static final String HASH_CODE_STRING = "hashToken";
     private final RestTemplate restTemplate;
     private final ApplicationParams applicationParams;
     private final SecurityUtils securityUtils;
@@ -219,6 +219,7 @@ public class CaseDocumentAttachOperation {
                 documentsDifference.put(key,value);
             }
         });
+        //Find documentId based on filter Map. So that I can filter the DocumentMetaData Object before calling the case document am Api.
         findDocumenstId(documentsDifference,filterDocumentSet);
         return filterDocumentSet;
     }
