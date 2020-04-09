@@ -21,6 +21,7 @@ import uk.gov.hmcts.ccd.endpoint.exceptions.CaseConcurrencyException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.DataParsingException;
 import uk.gov.hmcts.ccd.v2.external.domain.CaseDocument;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -62,7 +63,13 @@ public class CaseDocumentAttachOperation {
         try {
             LOG.debug("Updating  case using Version 2.1 of case create API");
             documentSetBeforeCallback = new HashMap<>();
-            extractDocumentFieldsBeforeCallback(caseDetails.getData(), documentSetBeforeCallback);
+            documentMetadata = DocumentMetadata.builder()
+                .caseId(caseDetails.getReference().toString())
+                .caseTypeId(caseDetails.getCaseTypeId())
+                .jurisdictionId(caseDetails.getJurisdiction())
+                .documents(new ArrayList<>())
+                .build();
+            extractDocumentFieldsForUpdateBeforeCallback(documentMetadata,caseDetails.getData(), documentSetBeforeCallback);
         }
         catch (Exception e) {
             LOG.error(CASE_DATA_PARSING_EXCEPTION);
@@ -74,7 +81,7 @@ public class CaseDocumentAttachOperation {
         try {
             documentAfterCallback = new HashMap<>();
             // to remove hashcode before compute delta
-            extractDocumentFieldsAfterCallback(documentMetadata, caseDetails.getData(),documentAfterCallback);
+            extractDocumentFieldsInUpdateCaseAfterCallback(documentMetadata, caseDetails.getData(),documentAfterCallback);
         }
         catch (Exception e) {
             LOG.error(CASE_DATA_PARSING_EXCEPTION);
@@ -88,21 +95,15 @@ public class CaseDocumentAttachOperation {
         HttpEntity<DocumentMetadata> requestEntity = new HttpEntity<>(documentMetadata, securityUtils.authorizationHeaders());
         restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
 
-        try {
-            if (!documentMetadata.getDocuments().isEmpty()) {
-                ResponseEntity<Boolean> result = restTemplate
-                    .exchange(applicationParams.getCaseDocumentAmApiHost().concat(applicationParams.getAttachDocumentPath()),
-                        HttpMethod.PATCH, requestEntity, Boolean.class);
 
-                if (!result.getStatusCode().equals(HttpStatus.OK) || result.getBody() == null || result.getBody().equals(false)) {
-                    LOG.error(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
-                    throw new CaseConcurrencyException(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
-                }
+            if (!documentMetadata.getDocuments().isEmpty()) {
+                 restTemplate
+                    .exchange(applicationParams.getCaseDocumentAmApiHost().concat(applicationParams.getAttachDocumentPath()),
+                        HttpMethod.PATCH, requestEntity, Void.class);
+
+
             }
-        } catch (Exception e) {
-            LOG.error(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
-            throw new CaseConcurrencyException(DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION);
-        }
+
     }
 
     public void extractDocumentFieldsBeforeCallback(Map<String, JsonNode> data, Map<String,String> documentMap) {
@@ -123,6 +124,30 @@ public class CaseDocumentAttachOperation {
             } else {
                 jsonNode.fields().forEachRemaining
                     (node -> extractDocumentFieldsBeforeCallback(
+                        Collections.singletonMap(node.getKey(), node.getValue()), documentMap));
+            }
+        });
+    }
+    public void extractDocumentFieldsForUpdateBeforeCallback(DocumentMetadata documentMetadata, Map<String, JsonNode> data, Map<String,String> documentMap) {
+        data.forEach((field, jsonNode) -> {
+            //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
+            //This quick check will reduce the processing time as most of filtering will be done at top level.
+            //****** Every document should have hashcode, else throw error
+            if (jsonNode != null && isDocumentField(jsonNode) && jsonNode.get(HASH_CODE_STRING) != null)  {
+                String documentId = extractDocumentId(jsonNode);
+                documentMetadata.getDocuments().add(CaseDocument
+                    .builder()
+                    .id(documentId)
+                    .hashToken(jsonNode.get(HASH_CODE_STRING).asText())
+                    .build());
+                documentMap.put(documentId,jsonNode.get(HASH_CODE_STRING).asText());
+                if (jsonNode instanceof ObjectNode) {
+                    ((ObjectNode) jsonNode).remove(HASH_CODE_STRING);
+                }
+
+            } else {
+                jsonNode.fields().forEachRemaining
+                    (node -> extractDocumentFieldsForUpdateBeforeCallback(documentMetadata,
                         Collections.singletonMap(node.getKey(), node.getValue()), documentMap));
             }
         });
@@ -156,6 +181,35 @@ public class CaseDocumentAttachOperation {
             }
         });
     }
+
+    public void extractDocumentFieldsInUpdateCaseAfterCallback(DocumentMetadata documentMetadata, Map<String, JsonNode> data, Map<String,String> documentMap) {
+        data.forEach((field, jsonNode) -> {
+            //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
+            //This quick check will reduce the processing time as most of filtering will be done at top level.
+            //****** Every document should have hashcode, else throw error
+            if (jsonNode != null && isDocumentField(jsonNode) && jsonNode.get(HASH_CODE_STRING) != null) {
+                String documentId = extractDocumentId(jsonNode);
+                documentMap.put(documentId,jsonNode.get(HASH_CODE_STRING).asText());
+                documentMetadata.getDocuments().add(CaseDocument
+                    .builder()
+                    .id(documentId)
+                    .hashToken(jsonNode.get(HASH_CODE_STRING).asText())
+                    .build());
+
+
+                if (jsonNode instanceof ObjectNode) {
+                    ((ObjectNode) jsonNode).remove(HASH_CODE_STRING);
+                }
+
+            } else {
+                jsonNode.fields().forEachRemaining
+                    (node -> extractDocumentFieldsInUpdateCaseAfterCallback(documentMetadata,
+                        Collections.singletonMap(node.getKey(), node.getValue()), documentMap));
+            }
+        });
+    }
+
+
 
     private boolean isDocumentField(JsonNode jsonNode) {
         return jsonNode.get(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null

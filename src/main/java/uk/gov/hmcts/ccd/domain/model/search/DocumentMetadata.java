@@ -33,7 +33,7 @@ public class DocumentMetadata {
     @JsonProperty
     private String jurisdictionId;
 
-    @JsonProperty("caseDocuments")
+    @JsonProperty("documentHashTokens")
     private List<CaseDocument> documents;
 
 }
