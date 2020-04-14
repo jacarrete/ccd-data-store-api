@@ -11,7 +11,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode
 @Builder
-public class CaseDocument implements Serializable {
+public class DocumentHashToken implements Serializable {
 
     @JsonProperty("id")
     private String id;

@@ -5,7 +5,7 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
-import uk.gov.hmcts.ccd.v2.external.domain.CaseDocument;
+import uk.gov.hmcts.ccd.v2.external.domain.DocumentHashToken;
 
 /**
  * CaseDocumentMetadata.
@@ -13,11 +13,11 @@ import uk.gov.hmcts.ccd.v2.external.domain.CaseDocument;
 
 @Data
 @Builder
-public class DocumentMetadata {
-    public DocumentMetadata() {
+public class CaseDocumentsMetadata {
+    public CaseDocumentsMetadata() {
     }
 
-    public DocumentMetadata(String caseId, String caseTypeId, String jurisdictionId, List<CaseDocument> documents) {
+    public CaseDocumentsMetadata(String caseId, String caseTypeId, String jurisdictionId, List<DocumentHashToken> documents) {
         this.caseId = caseId;
         this.caseTypeId = caseTypeId;
         this.jurisdictionId = jurisdictionId;
@@ -34,6 +34,6 @@ public class DocumentMetadata {
     private String jurisdictionId;
 
     @JsonProperty("documentHashTokens")
-    private List<CaseDocument> documents;
+    private List<DocumentHashToken> documents;
 
 }
