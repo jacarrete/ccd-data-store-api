@@ -25,6 +25,7 @@ import uk.gov.hmcts.ccd.domain.service.common.CaseTypeService;
 import uk.gov.hmcts.ccd.domain.service.common.EventTriggerService;
 import uk.gov.hmcts.ccd.domain.service.common.SecurityClassificationService;
 import uk.gov.hmcts.ccd.domain.service.common.UIDService;
+import uk.gov.hmcts.ccd.domain.service.getcasedocument.CaseDocumentAttachOperation;
 import uk.gov.hmcts.ccd.domain.service.stdapi.AboutToSubmitCallbackResponse;
 import uk.gov.hmcts.ccd.domain.service.stdapi.CallbackInvoker;
 import uk.gov.hmcts.ccd.domain.service.validate.ValidateCaseFieldsOperation;
@@ -36,10 +37,13 @@ import uk.gov.hmcts.ccd.infrastructure.user.UserAuthorisation;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -49,12 +53,15 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import uk.gov.hmcts.ccd.v2.V2;
 
 @Service
 public class CreateCaseEventService {
 
-    private static final ObjectMapper mapper = new ObjectMapper();
 
+    @Inject
+    private HttpServletRequest request;
+    private static final ObjectMapper mapper = new ObjectMapper();
     private final UserRepository userRepository;
     private final CaseDetailsRepository caseDetailsRepository;
     private final CaseDefinitionRepository caseDefinitionRepository;
@@ -71,6 +78,8 @@ public class CreateCaseEventService {
     private final ValidateCaseFieldsOperation validateCaseFieldsOperation;
     private final UserAuthorisation userAuthorisation;
     private final Clock clock;
+    public static final String CONTENT_TYPE = "content-type";
+    private final CaseDocumentAttachOperation  caseDocumentAttachOperation;
 
     @Inject
     public CreateCaseEventService(@Qualifier(CachedUserRepository.QUALIFIER) final UserRepository userRepository,
@@ -88,7 +97,8 @@ public class CreateCaseEventService {
                                   final SecurityClassificationService securityClassificationService,
                                   final ValidateCaseFieldsOperation validateCaseFieldsOperation,
                                   final UserAuthorisation userAuthorisation,
-                                  @Qualifier("utcClock") final Clock clock) {
+                                  @Qualifier("utcClock") final Clock clock,
+                                  CaseDocumentAttachOperation caseDocumentAttachOperation) {
         this.userRepository = userRepository;
         this.caseDetailsRepository = caseDetailsRepository;
         this.caseDefinitionRepository = caseDefinitionRepository;
@@ -105,6 +115,7 @@ public class CreateCaseEventService {
         this.validateCaseFieldsOperation = validateCaseFieldsOperation;
         this.userAuthorisation = userAuthorisation;
         this.clock = clock;
+        this.caseDocumentAttachOperation = caseDocumentAttachOperation;
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
@@ -120,21 +131,57 @@ public class CreateCaseEventService {
         eventTokenService.validateToken(content.getToken(), uid, caseDetails, eventTrigger, caseType.getJurisdiction(), caseType);
 
         validatePreState(caseDetails, eventTrigger);
+        //  content
+        // Logic start from here to attach document with case ID
+        boolean isApiVersion21 = request.getHeader(CONTENT_TYPE) != null
+            && request.getHeader(CONTENT_TYPE).equals(V2.MediaType.CREATE_EVENT_2_1);
+
+        if (isApiVersion21) {
+            // before call back
+            caseDocumentAttachOperation.beforeCallbackPrepareDocumentMetaData(content);
+        }
         mergeUpdatedFieldsToCaseDetails(content.getData(), caseDetails, eventTrigger, caseType);
+
         AboutToSubmitCallbackResponse aboutToSubmitCallbackResponse = callbackInvoker.invokeAboutToSubmitCallback(eventTrigger,
             caseDetailsBefore,
             caseDetails,
             caseType,
             content.getIgnoreWarning());
 
+
         final Optional<String>
             newState = aboutToSubmitCallbackResponse.getState();
 
         validateCaseFieldsOperation.validateData(caseDetails.getData(), caseType);
         LocalDateTime timeNow = now();
+
+        //Changes start after callback response
+        if (isApiVersion21) {
+           // if(aboutToSubmitCallbackResponse.)
+                // to remove hashcode after callback
+               caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(caseDetails);
+
+               //filter DocumentMetaData Object based on callback response
+               caseDocumentAttachOperation.filterDocumentFields();
+
+
+                //sanitize data to prepare the Document object to be send to case document am api
+                final Set<String> filterDocumentSet = caseDocumentAttachOperation.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore, caseDetails.getData());
+
+                // to filter the DocumentMetaData based on filterDocumentSet.
+               caseDocumentAttachOperation.filterDocumentMetaData(filterDocumentSet);
+
+        }
+
+
         final CaseDetails savedCaseDetails = saveCaseDetails(caseDetailsBefore, caseDetails, eventTrigger, newState, timeNow);
         saveAuditEventForCaseDetails(aboutToSubmitCallbackResponse, content.getEvent(), eventTrigger, savedCaseDetails, caseType, timeNow);
 
+        // Case Document API Call to attach the case with respective document
+        if (isApiVersion21) {
+            //rest api call
+            caseDocumentAttachOperation.restCallToAttachCaseDocuments();
+        }
         return CreateCaseEventResult.caseEventWith()
             .caseDetailsBefore(caseDetailsBefore)
             .savedCaseDetails(savedCaseDetails)
@@ -192,8 +239,11 @@ public class CreateCaseEventService {
                                                  final CaseDetails caseDetails,
                                                  final CaseEvent caseEvent,
                                                  final CaseType caseType) {
+
         if (null != data) {
+
             final Map<String, JsonNode> sanitisedData = caseSanitiser.sanitise(caseType, data);
+
             for (Map.Entry<String, JsonNode> field : sanitisedData.entrySet()) {
                 caseDetails.getData().put(field.getKey(), field.getValue());
             }

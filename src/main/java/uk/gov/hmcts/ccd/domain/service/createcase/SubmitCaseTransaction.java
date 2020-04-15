@@ -1,5 +1,16 @@
 package uk.gov.hmcts.ccd.domain.service.createcase;
 
+import static javax.transaction.Transactional.TxType.REQUIRES_NEW;
+import static uk.gov.hmcts.ccd.data.caseaccess.GlobalCaseRole.CREATOR;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
+import javax.transaction.Transactional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -15,27 +26,25 @@ import uk.gov.hmcts.ccd.domain.model.definition.CaseEvent;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseState;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseType;
 import uk.gov.hmcts.ccd.domain.model.std.AuditEvent;
+import uk.gov.hmcts.ccd.domain.model.std.CaseDataContent;
 import uk.gov.hmcts.ccd.domain.model.std.Event;
 import uk.gov.hmcts.ccd.domain.service.common.CaseTypeService;
 import uk.gov.hmcts.ccd.domain.service.common.SecurityClassificationService;
 import uk.gov.hmcts.ccd.domain.service.common.UIDService;
+import uk.gov.hmcts.ccd.domain.service.getcasedocument.CaseDocumentAttachOperation;
 import uk.gov.hmcts.ccd.domain.service.stdapi.AboutToSubmitCallbackResponse;
 import uk.gov.hmcts.ccd.domain.service.stdapi.CallbackInvoker;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ReferenceKeyUniqueConstraintException;
 import uk.gov.hmcts.ccd.infrastructure.user.UserAuthorisation;
 import uk.gov.hmcts.ccd.infrastructure.user.UserAuthorisation.AccessLevel;
-
-import javax.inject.Inject;
-import javax.transaction.Transactional;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-
-import static javax.transaction.Transactional.TxType.REQUIRES_NEW;
-import static uk.gov.hmcts.ccd.data.caseaccess.GlobalCaseRole.CREATOR;
+import uk.gov.hmcts.ccd.v2.V2;
 
 @Service
 class SubmitCaseTransaction {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SubmitCaseTransaction.class);
+
+    private HttpServletRequest request;
     private final CaseDetailsRepository caseDetailsRepository;
     private final CaseAuditEventRepository caseAuditEventRepository;
     private final CaseTypeService caseTypeService;
@@ -44,6 +53,7 @@ class SubmitCaseTransaction {
     private final SecurityClassificationService securityClassificationService;
     private final CaseUserRepository caseUserRepository;
     private final UserAuthorisation userAuthorisation;
+    private final CaseDocumentAttachOperation caseDocumentAttachOperation;
 
     @Inject
     public SubmitCaseTransaction(@Qualifier(CachedCaseDetailsRepository.QUALIFIER) final CaseDetailsRepository caseDetailsRepository,
@@ -52,9 +62,12 @@ class SubmitCaseTransaction {
                                  final CallbackInvoker callbackInvoker,
                                  final UIDService uidService,
                                  final SecurityClassificationService securityClassificationService,
-                                 final @Qualifier(CachedCaseUserRepository.QUALIFIER)  CaseUserRepository caseUserRepository,
-                                 final UserAuthorisation userAuthorisation
-                                 ) {
+                                 final @Qualifier(CachedCaseUserRepository.QUALIFIER) CaseUserRepository caseUserRepository,
+                                 final UserAuthorisation userAuthorisation,
+                                 HttpServletRequest request,
+                                 CaseDocumentAttachOperation caseDocumentAttachOperation
+    ) {
+        this.request = request;
         this.caseDetailsRepository = caseDetailsRepository;
         this.caseAuditEventRepository = caseAuditEventRepository;
         this.caseTypeService = caseTypeService;
@@ -63,6 +76,7 @@ class SubmitCaseTransaction {
         this.securityClassificationService = securityClassificationService;
         this.caseUserRepository = caseUserRepository;
         this.userAuthorisation = userAuthorisation;
+        this.caseDocumentAttachOperation = caseDocumentAttachOperation;
     }
 
     @Transactional(REQUIRES_NEW)
@@ -83,6 +97,13 @@ class SubmitCaseTransaction {
         newCaseDetails.setLastStateModifiedDate(now);
         newCaseDetails.setReference(Long.valueOf(uidService.generateUID()));
 
+        boolean isApiVersion21 = request.getContentType() != null
+            && request.getContentType().equals(V2.MediaType.CREATE_CASE_2_1);
+
+        if (isApiVersion21) {
+           // caseDocumentAttachOperation.beforeCallbackPrepareDocumentMetaData(CaseDataContent caseDataContent);
+        }
+
         /*
             About to submit
 
@@ -97,8 +118,14 @@ class SubmitCaseTransaction {
 
         if (AccessLevel.GRANTED.equals(userAuthorisation.getAccessLevel())) {
             caseUserRepository.grantAccess(Long.valueOf(savedCaseDetails.getId()),
-                                           idamUser.getId(),
-                                           CREATOR.getRole());
+                idamUser.getId(),
+                CREATOR.getRole());
+        }
+
+        if (isApiVersion21) {
+            caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(newCaseDetails);
+            caseDocumentAttachOperation.filterDocumentFields();
+            caseDocumentAttachOperation.restCallToAttachCaseDocuments();
         }
 
         return savedCaseDetails;
