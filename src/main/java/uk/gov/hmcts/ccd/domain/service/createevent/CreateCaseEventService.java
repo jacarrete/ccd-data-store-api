@@ -59,7 +59,7 @@ import uk.gov.hmcts.ccd.v2.V2;
 public class CreateCaseEventService {
 
 
-    @Inject
+
     private HttpServletRequest request;
     private static final ObjectMapper mapper = new ObjectMapper();
     private final UserRepository userRepository;
@@ -82,7 +82,7 @@ public class CreateCaseEventService {
     private final CaseDocumentAttachOperation  caseDocumentAttachOperation;
 
     @Inject
-    public CreateCaseEventService(@Qualifier(CachedUserRepository.QUALIFIER) final UserRepository userRepository,
+    public CreateCaseEventService(HttpServletRequest request, @Qualifier(CachedUserRepository.QUALIFIER) final UserRepository userRepository,
                                   @Qualifier(CachedCaseDetailsRepository.QUALIFIER) final CaseDetailsRepository caseDetailsRepository,
                                   @Qualifier(CachedCaseDefinitionRepository.QUALIFIER) final CaseDefinitionRepository caseDefinitionRepository,
                                   final CaseAuditEventRepository caseAuditEventRepository,
@@ -99,6 +99,7 @@ public class CreateCaseEventService {
                                   final UserAuthorisation userAuthorisation,
                                   @Qualifier("utcClock") final Clock clock,
                                   CaseDocumentAttachOperation caseDocumentAttachOperation) {
+        this.request = request;
         this.userRepository = userRepository;
         this.caseDetailsRepository = caseDetailsRepository;
         this.caseDefinitionRepository = caseDefinitionRepository;
@@ -133,8 +134,8 @@ public class CreateCaseEventService {
         validatePreState(caseDetails, eventTrigger);
         //  content
         // Logic start from here to attach document with case ID
-        boolean isApiVersion21 = request.getHeader(CONTENT_TYPE) != null
-            && request.getHeader(CONTENT_TYPE).equals(V2.MediaType.CREATE_EVENT_2_1);
+        boolean isApiVersion21 = request.getContentType() != null
+            && request.getContentType().equals(V2.MediaType.CREATE_EVENT_2_1);
 
         if (isApiVersion21) {
             // before call back
