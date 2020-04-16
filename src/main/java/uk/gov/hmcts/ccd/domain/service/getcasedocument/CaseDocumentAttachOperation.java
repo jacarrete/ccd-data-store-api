@@ -147,8 +147,6 @@ public class CaseDocumentAttachOperation {
     }
 
 
-
-
     private boolean isDocumentField(JsonNode jsonNode) {
         return jsonNode.get(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null
             || jsonNode.get(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) != null;
@@ -171,7 +169,6 @@ public class CaseDocumentAttachOperation {
 
           if(documentSetAfterCallback.size()>0) {
 
-
               // find ids of document inside before call back map which are coming through after call back map
               List<String> commonDocumentIds=documentSetAfterCallback.keySet().stream().filter(str->documentSetBeforeCallback.containsKey(str)).collect(Collectors.toList());
 
@@ -184,7 +181,7 @@ public class CaseDocumentAttachOperation {
               //putting back documentIds with hashToken in after call back map  which belong to before callback Map
               documentSetAfterCallback.putAll(beforeCallBackFilterMap);
 
-              //  filter after callback  map having hash token
+              // filter after callback  map having hash token
              Map<String,String> finalMap= documentSetAfterCallback.entrySet().stream().filter(e->e.getValue()!=null).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
               //Filter DocumentHashToken based on finalMap
@@ -195,8 +192,6 @@ public class CaseDocumentAttachOperation {
                       .hashToken(value)
                       .build());
               });
-
-
 
           }else{
 

@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,7 +94,7 @@ public class CaseDocumentAttachOperationTest {
     void shouldFilterCaseDocumentMetaData_With_Scenario_1() {
 
         prepareInputs();
-        
+
         Map<String,String> afterCallBack = new HashMap<>();
         afterCallBack.put("320233b8-fb61-4b58-8731-23c83638c9c6",null);
         afterCallBack.put("f5bd63a2-65c5-435e-a972-98ed658ad7d6",null);
@@ -186,6 +185,28 @@ public class CaseDocumentAttachOperationTest {
                 .hashToken("4d49edc151423fb7b2e1f22d89a2d041b63").build(),
             DocumentHashToken.builder().id("b6ee2bff-8244-431f-94ec-9d8ecace8dd6")
                 .hashToken("4d49edc151423fb7b2e1f22d89a2d041b43").build()
+        );
+
+        caseDocumentAttachOperation.filterDocumentFields(caseDocumentsMetadata,beforeCallBack,afterCallBack);
+
+        List<DocumentHashToken> actual=caseDocumentsMetadata.getDocuments();
+
+        assertAll(
+            () -> assertEquals(actual, expected)
+
+        );
+    }
+
+    @Test
+    @DisplayName("should  filter the Case Document Meta Data while  2 documents with hashcode from request and  no response from callback ")
+    void shouldFilterCaseDocumentMetaData_With_Scenario_5() {
+        prepareInputs();
+        Map<String,String> afterCallBack = new HashMap<>();
+        List<DocumentHashToken> expected = Arrays.asList(
+            DocumentHashToken.builder().id("b6ee2bff-8244-431f-94ec-9d8ecace8dd6")
+                .hashToken("4d49edc151423fb7b2e1f22d89a2d041b43").build(),
+            DocumentHashToken.builder().id("e16f2ae0-d6ce-4bd0-a652-47b3c4d86292")
+                .hashToken("4d49edc151423fb7b2e1f22d87b2d041b34").build()
         );
 
         caseDocumentAttachOperation.filterDocumentFields(caseDocumentsMetadata,beforeCallBack,afterCallBack);

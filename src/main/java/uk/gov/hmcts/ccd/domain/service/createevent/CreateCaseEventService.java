@@ -132,13 +132,12 @@ public class CreateCaseEventService {
         eventTokenService.validateToken(content.getToken(), uid, caseDetails, eventTrigger, caseType.getJurisdiction(), caseType);
 
         validatePreState(caseDetails, eventTrigger);
-        //  content
+
         // Logic start from here to attach document with case ID
         boolean isApiVersion21 = request.getContentType() != null
             && request.getContentType().equals(V2.MediaType.CREATE_EVENT_2_1);
 
         if (isApiVersion21) {
-            // before call back
             caseDocumentAttachOperation.beforeCallbackPrepareDocumentMetaData(content);
         }
         mergeUpdatedFieldsToCaseDetails(content.getData(), caseDetails, eventTrigger, caseType);
@@ -156,23 +155,17 @@ public class CreateCaseEventService {
         validateCaseFieldsOperation.validateData(caseDetails.getData(), caseType);
         LocalDateTime timeNow = now();
 
-        //Changes start after callback response
         if (isApiVersion21) {
-            boolean callBackResult = false;
-               if(eventTrigger.getCallBackURLAboutToSubmitEvent() !=null) {
-                   callBackResult=true;
-               }
-              // to remove hashcode after callback
-             caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(caseDetails,callBackResult);
-               //filter DocumentMetaData Object based on callback response
-               caseDocumentAttachOperation.filterDocumentFields();
+            boolean callBackResult = eventTrigger.getCallBackURLAboutToSubmitEvent() !=null;
+            caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(caseDetails,callBackResult);
 
+            caseDocumentAttachOperation.filterDocumentFields();
 
-                //sanitize data to prepare the Document object to be send to case document am api
-                final Set<String> filterDocumentSet = caseDocumentAttachOperation.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore, caseDetails.getData());
+            //find difference between request payload and existing case detail in db
+            final Set<String> filterDocumentSet = caseDocumentAttachOperation.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore, caseDetails.getData());
 
-                // to filter the DocumentMetaData based on filterDocumentSet.
-               caseDocumentAttachOperation.filterDocumentMetaData(filterDocumentSet);
+            //to filter the DocumentMetaData based on filterDocumentSet.
+            caseDocumentAttachOperation.filterDocumentMetaData(filterDocumentSet);
 
         }
 
@@ -180,7 +173,7 @@ public class CreateCaseEventService {
         final CaseDetails savedCaseDetails = saveCaseDetails(caseDetailsBefore, caseDetails, eventTrigger, newState, timeNow);
         saveAuditEventForCaseDetails(aboutToSubmitCallbackResponse, content.getEvent(), eventTrigger, savedCaseDetails, caseType, timeNow);
 
-        // Case Document API Call to attach the case with respective document
+
         if (isApiVersion21) {
             //rest api call
             caseDocumentAttachOperation.restCallToAttachCaseDocuments();
