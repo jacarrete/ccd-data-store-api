@@ -46,7 +46,6 @@ public class CaseDocumentAttachOperation {
     private final RestTemplate restTemplate;
     private final ApplicationParams applicationParams;
     private final SecurityUtils securityUtils;
-    public static final String DOCUMENTS_ALTERED_OUTSIDE_TRANSACTION = "The documents have been altered outside the create case transaction";
     public static final String BINARY = "/binary";
 
     public CaseDocumentAttachOperation(@Qualifier("restTemplate") final RestTemplate restTemplate,
@@ -58,22 +57,14 @@ public class CaseDocumentAttachOperation {
     }
 
     public void  beforeCallbackPrepareDocumentMetaData( CaseDataContent contentData){
-        try {
+
             LOG.debug("Updating  case using Version 2.1 of case create API");
             documentSetBeforeCallback = new HashMap<>();
             extractDocumentFieldsBeforeCallback(contentData.getData(), documentSetBeforeCallback);
-        }
-        catch(BadRequestException be){
-            LOG.error(be.getMessage());
-            throw be;
-        }
-        catch (Exception e) {
-            LOG.error(CASE_DATA_PARSING_EXCEPTION);
-            throw new DataParsingException(CASE_DATA_PARSING_EXCEPTION);
-        }
+
     }
 
-    public void  afterCallbackPrepareDocumentMetaData(CaseDetails caseDetails){
+    public void  afterCallbackPrepareDocumentMetaData(CaseDetails caseDetails,boolean callBackResult){
         try {
             documentAfterCallback = new HashMap<>();
             caseDocumentsMetadata = CaseDocumentsMetadata.builder()
@@ -83,8 +74,9 @@ public class CaseDocumentAttachOperation {
                 .documents(new ArrayList<>())
                 .build();
 
-            // to remove hashcode before compute delta
-            extractDocumentFieldsAfterCallback(caseDocumentsMetadata, caseDetails.getData(),documentAfterCallback);
+            if(callBackResult)
+                // to remove hashcode before compute delta
+             extractDocumentFieldsAfterCallback(caseDocumentsMetadata, caseDetails.getData(),documentAfterCallback);
         }
         catch (Exception e) {
             LOG.error(CASE_DATA_PARSING_EXCEPTION);
@@ -141,13 +133,6 @@ public class CaseDocumentAttachOperation {
 
                 String documentId = extractDocumentId(jsonNode);
                 documentMap.put(documentId,jsonNode.get(HASH_CODE_STRING).asText());
-                caseDocumentsMetadata.getDocuments().add(DocumentHashToken
-                    .builder()
-                    .id(documentId)
-                    .hashToken(jsonNode.get(HASH_CODE_STRING).asText())
-                    .build());
-
-
                 if (jsonNode instanceof ObjectNode) {
                     ((ObjectNode) jsonNode).remove(HASH_CODE_STRING);
                 }
@@ -180,48 +165,49 @@ public class CaseDocumentAttachOperation {
         }
     }
 
-     //scenarion 1 incoming three and from service 2 without hash token
-    //scenario 2 incoming 3 and from services 2 new with hash token
-    //scenario 3 incomg 3 and from services 2 replacement without hash token
-     //scenario 4 incomg 3 and from services 2 replacement with hash token
-    //scenario 5 incoming 3 and from services 1 existing without hash token
-     //scenario 6 incoming 3 and from services 1 existing and 2 new without hash token
-     //scenario 7 incoming 3 and from services 1 existing and 2 new with hash token
-    private void filterDocumentFields(CaseDocumentsMetadata caseDocumentsMetadata, Map<String,String> documentSetBeforeCallback, Map<String,String> documentSetAfterCallback) {
+
+    public void filterDocumentFields(CaseDocumentsMetadata caseDocumentsMetadata, Map<String,String> documentSetBeforeCallback, Map<String,String> documentSetAfterCallback) {
         try {
-            //Below line should be remove before promoting to PR env.
-//            documentSetAfterCallback.putAll(documentSetBeforeCallback);
+
           if(documentSetAfterCallback.size()>0) {
-//              //find documents which are intersection of Before and after callback
-//              Map<String, String> filteredDocumentSet = documentSetAfterCallback.entrySet().stream()
-//                  .filter(entry -> documentSetBeforeCallback.containsKey(entry.getKey()) && documentSetBeforeCallback.get(entry.getKey()).equals(entry.getValue()))
-//                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-              //for loop for each entry in aftercallback map check
-              // find documentid in before call back
-              // if found & then extraxt hashToken
-              // and put into aftercall back entry
-
-              // now filter aftercallback  map having hash token
 
 
-              //Add the intersection to aftercallback list. Now, afterCallbackList will have the documents from
-              //Callback response
-              // + original documents which have not been removed by the callback
-              // + Any new documents which are added by callback response
-              //This code should drop any documents which were removed by the callback
-             // documentSetAfterCallback.putAll(filteredDocumentSet);
-              //Union with before(Scenario 2)
+              // find ids of document inside before call back map which are coming through after call back map
+              List<String> commonDocumentIds=documentSetAfterCallback.keySet().stream().filter(str->documentSetBeforeCallback.containsKey(str)).collect(Collectors.toList());
 
-              List<DocumentHashToken> filterCaseDocument = caseDocumentsMetadata.getDocuments().stream().filter(caseDocument -> documentSetAfterCallback.containsKey(caseDocument.getId()) && documentSetAfterCallback.get(caseDocument.getId()).equals(caseDocument.getHashToken())).collect(Collectors.toList());
-              caseDocumentsMetadata.setDocuments(filterCaseDocument);
+              //find Hash token of documents belong to  before call back which are in After callback Map
+              Map<String,String> beforeCallBackFilterMap = documentSetBeforeCallback.entrySet()
+                  .stream()
+                  .filter(e -> commonDocumentIds.contains(e.getKey()))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+              //putting back documentIds with hashToken in after call back map  which belong to before callback Map
+              documentSetAfterCallback.putAll(beforeCallBackFilterMap);
+
+              //  filter after callback  map having hash token
+             Map<String,String> finalMap= documentSetAfterCallback.entrySet().stream().filter(e->e.getValue()!=null).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+              //Filter DocumentHashToken based on finalMap
+              finalMap.forEach((key, value) -> {
+                  caseDocumentsMetadata.getDocuments().add(DocumentHashToken
+                      .builder()
+                      .id(key)
+                      .hashToken(value)
+                      .build());
+              });
+
+
+
           }else{
-            // scenario 3  extractDocumentFieldsAfterCallback_new();
-              // intersection with before scenario 3
-              // need to modify as per before
-              List<DocumentHashToken> filterCaseDocument = caseDocumentsMetadata.getDocuments().stream().filter(caseDocument -> documentSetBeforeCallback.containsKey(caseDocument.getId())
-                  && documentSetBeforeCallback.get(caseDocument.getId()).equals(caseDocument.getHashToken())).collect(Collectors.toList());
-              caseDocumentsMetadata.setDocuments(filterCaseDocument);
+
+              documentSetBeforeCallback.forEach((key, value) -> {
+                  caseDocumentsMetadata.getDocuments().add(DocumentHashToken
+                      .builder()
+                      .id(key)
+                      .hashToken(value)
+                      .build());
+                  });
+
           }
         } catch (Exception e) {
             LOG.error("Exception while filtering the document fields.");
@@ -250,10 +236,10 @@ public class CaseDocumentAttachOperation {
             }
         });
         //Find documentId based on filter Map. So that I can filter the DocumentMetaData Object before calling the case document am Api.
-        findDocumenstId(documentsDifference,filterDocumentSet);
+        findDocumentsId(documentsDifference,filterDocumentSet);
         return filterDocumentSet;
     }
-    private void findDocumenstId(Map<String, JsonNode> sanitisedDataToAttachDoc, Set<String> filterDocumentSet) {
+    private void findDocumentsId(Map<String, JsonNode> sanitisedDataToAttachDoc, Set<String> filterDocumentSet) {
 
         sanitisedDataToAttachDoc.forEach((field, jsonNode) -> {
             //Check if the field consists of Document at any level, e.g. Complex fields can also have documents.
@@ -265,7 +251,7 @@ public class CaseDocumentAttachOperation {
 
             } else {
                 jsonNode.fields().forEachRemaining
-                    (node -> findDocumenstId(
+                    (node -> findDocumentsId(
                         Collections.singletonMap(node.getKey(), node.getValue()), filterDocumentSet));
             }
         });

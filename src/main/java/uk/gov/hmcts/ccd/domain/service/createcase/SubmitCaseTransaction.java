@@ -123,7 +123,7 @@ class SubmitCaseTransaction {
         }
 
         if (isApiVersion21) {
-            caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(newCaseDetails);
+            caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(newCaseDetails,false);
             caseDocumentAttachOperation.filterDocumentFields();
             caseDocumentAttachOperation.restCallToAttachCaseDocuments();
         }
