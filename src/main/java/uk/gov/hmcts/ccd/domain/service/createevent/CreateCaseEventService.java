@@ -3,6 +3,9 @@ package uk.gov.hmcts.ccd.domain.service.createevent;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 
+import org.springframework.web.client.RestTemplate;
+import uk.gov.hmcts.ccd.ApplicationParams;
+import uk.gov.hmcts.ccd.data.SecurityUtils;
 import uk.gov.hmcts.ccd.data.casedetails.CachedCaseDetailsRepository;
 import uk.gov.hmcts.ccd.data.casedetails.CaseAuditEventRepository;
 import uk.gov.hmcts.ccd.data.casedetails.CaseDetailsRepository;
@@ -25,7 +28,7 @@ import uk.gov.hmcts.ccd.domain.service.common.CaseTypeService;
 import uk.gov.hmcts.ccd.domain.service.common.EventTriggerService;
 import uk.gov.hmcts.ccd.domain.service.common.SecurityClassificationService;
 import uk.gov.hmcts.ccd.domain.service.common.UIDService;
-import uk.gov.hmcts.ccd.domain.service.getcasedocument.CaseDocumentAttachOperation;
+import uk.gov.hmcts.ccd.domain.service.getcasedocument.CaseDocumentAttacher;
 import uk.gov.hmcts.ccd.domain.service.stdapi.AboutToSubmitCallbackResponse;
 import uk.gov.hmcts.ccd.domain.service.stdapi.CallbackInvoker;
 import uk.gov.hmcts.ccd.domain.service.validate.ValidateCaseFieldsOperation;
@@ -79,7 +82,10 @@ public class CreateCaseEventService {
     private final UserAuthorisation userAuthorisation;
     private final Clock clock;
     public static final String CONTENT_TYPE = "content-type";
-    private final CaseDocumentAttachOperation  caseDocumentAttachOperation;
+    private final RestTemplate restTemplate;
+    private final ApplicationParams applicationParams;
+    private final SecurityUtils securityUtils;
+   // private final CaseDocumentAttachOperation  caseDocumentAttachOperation;
 
     @Inject
     public CreateCaseEventService(HttpServletRequest request, @Qualifier(CachedUserRepository.QUALIFIER) final UserRepository userRepository,
@@ -98,7 +104,10 @@ public class CreateCaseEventService {
                                   final ValidateCaseFieldsOperation validateCaseFieldsOperation,
                                   final UserAuthorisation userAuthorisation,
                                   @Qualifier("utcClock") final Clock clock,
-                                  CaseDocumentAttachOperation caseDocumentAttachOperation) {
+                                  @Qualifier("restTemplate") final RestTemplate restTemplate,
+                                  ApplicationParams applicationParams,
+                                  SecurityUtils securityUtils
+                                  ) {
         this.request = request;
         this.userRepository = userRepository;
         this.caseDetailsRepository = caseDetailsRepository;
@@ -116,7 +125,9 @@ public class CreateCaseEventService {
         this.validateCaseFieldsOperation = validateCaseFieldsOperation;
         this.userAuthorisation = userAuthorisation;
         this.clock = clock;
-        this.caseDocumentAttachOperation = caseDocumentAttachOperation;
+        this.restTemplate = restTemplate;
+        this.applicationParams = applicationParams;
+        this.securityUtils = securityUtils;
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
@@ -137,8 +148,10 @@ public class CreateCaseEventService {
         boolean isApiVersion21 = request.getContentType() != null
             && request.getContentType().equals(V2.MediaType.CREATE_EVENT_2_1);
 
+        CaseDocumentAttacher caseDocumentAttacher =null;
         if (isApiVersion21) {
-            caseDocumentAttachOperation.beforeCallbackPrepareDocumentMetaData(content);
+            caseDocumentAttacher  = new CaseDocumentAttacher(restTemplate,applicationParams,securityUtils);
+            caseDocumentAttacher.extractDocumentsWithHashTokenBeforeCallback(content.getData());
         }
         mergeUpdatedFieldsToCaseDetails(content.getData(), caseDetails, eventTrigger, caseType);
 
@@ -156,16 +169,8 @@ public class CreateCaseEventService {
         LocalDateTime timeNow = now();
 
         if (isApiVersion21) {
-            boolean callBackResult = eventTrigger.getCallBackURLAboutToSubmitEvent() !=null;
-            caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(caseDetails,callBackResult);
 
-            caseDocumentAttachOperation.filterDocumentFields();
-
-            //find difference between request payload and existing case detail in db
-            final Set<String> filterDocumentSet = caseDocumentAttachOperation.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore, caseDetails.getData());
-
-            //to filter the DocumentMetaData based on filterDocumentSet.
-            caseDocumentAttachOperation.filterDocumentMetaData(filterDocumentSet);
+            caseDocumentAttacher.caseDocumentAttacherOperations(caseDetails, caseDetailsBefore,content.getEvent().getEventId(),newState.isPresent());
 
         }
 
@@ -176,7 +181,7 @@ public class CreateCaseEventService {
 
         if (isApiVersion21) {
             //rest api call
-            caseDocumentAttachOperation.restCallToAttachCaseDocuments();
+            caseDocumentAttacher.restCallToAttachCaseDocuments();
         }
         return CreateCaseEventResult.caseEventWith()
             .caseDetailsBefore(caseDetailsBefore)

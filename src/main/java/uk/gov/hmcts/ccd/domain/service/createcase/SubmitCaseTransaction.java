@@ -26,12 +26,11 @@ import uk.gov.hmcts.ccd.domain.model.definition.CaseEvent;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseState;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseType;
 import uk.gov.hmcts.ccd.domain.model.std.AuditEvent;
-import uk.gov.hmcts.ccd.domain.model.std.CaseDataContent;
 import uk.gov.hmcts.ccd.domain.model.std.Event;
 import uk.gov.hmcts.ccd.domain.service.common.CaseTypeService;
 import uk.gov.hmcts.ccd.domain.service.common.SecurityClassificationService;
 import uk.gov.hmcts.ccd.domain.service.common.UIDService;
-import uk.gov.hmcts.ccd.domain.service.getcasedocument.CaseDocumentAttachOperation;
+import uk.gov.hmcts.ccd.domain.service.getcasedocument.CaseDocumentAttacher;
 import uk.gov.hmcts.ccd.domain.service.stdapi.AboutToSubmitCallbackResponse;
 import uk.gov.hmcts.ccd.domain.service.stdapi.CallbackInvoker;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ReferenceKeyUniqueConstraintException;
@@ -53,7 +52,7 @@ class SubmitCaseTransaction {
     private final SecurityClassificationService securityClassificationService;
     private final CaseUserRepository caseUserRepository;
     private final UserAuthorisation userAuthorisation;
-    private final CaseDocumentAttachOperation caseDocumentAttachOperation;
+    //private final CaseDocumentAttacher caseDocumentAttacher;
 
     @Inject
     public SubmitCaseTransaction(@Qualifier(CachedCaseDetailsRepository.QUALIFIER) final CaseDetailsRepository caseDetailsRepository,
@@ -64,8 +63,8 @@ class SubmitCaseTransaction {
                                  final SecurityClassificationService securityClassificationService,
                                  final @Qualifier(CachedCaseUserRepository.QUALIFIER) CaseUserRepository caseUserRepository,
                                  final UserAuthorisation userAuthorisation,
-                                 HttpServletRequest request,
-                                 CaseDocumentAttachOperation caseDocumentAttachOperation
+                                 HttpServletRequest request
+                                 //CaseDocumentAttacher caseDocumentAttacher
     ) {
         this.request = request;
         this.caseDetailsRepository = caseDetailsRepository;
@@ -76,7 +75,7 @@ class SubmitCaseTransaction {
         this.securityClassificationService = securityClassificationService;
         this.caseUserRepository = caseUserRepository;
         this.userAuthorisation = userAuthorisation;
-        this.caseDocumentAttachOperation = caseDocumentAttachOperation;
+        //this.caseDocumentAttacher = caseDocumentAttacher;
     }
 
     @Transactional(REQUIRES_NEW)
@@ -123,9 +122,9 @@ class SubmitCaseTransaction {
         }
 
         if (isApiVersion21) {
-            caseDocumentAttachOperation.afterCallbackPrepareDocumentMetaData(newCaseDetails,false);
-            caseDocumentAttachOperation.filterDocumentFields();
-            caseDocumentAttachOperation.restCallToAttachCaseDocuments();
+           // caseDocumentAttacher.extractDocumentsAfterCallBack(newCaseDetails,false);
+            //caseDocumentAttacher.consolidateDocumentsWithHashTokenAfterCallBack();
+            //caseDocumentAttacher.restCallToAttachCaseDocuments();
         }
 
         return savedCaseDetails;
