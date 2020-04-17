@@ -154,8 +154,8 @@ class SubmitCaseTransactionTest {
             securityClassificationService,
             caseUserRepository,
             userAuthorisation,
-            request,
-            caseDocumentAttacher
+            request
+           // caseDocumentAttacher
         );
 
         event = buildEvent();

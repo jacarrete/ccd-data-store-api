@@ -6,13 +6,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import uk.gov.hmcts.ccd.ApplicationParams;
 import uk.gov.hmcts.ccd.data.SecurityUtils;
 import uk.gov.hmcts.ccd.domain.model.definition.CaseDetails;
 import uk.gov.hmcts.ccd.domain.model.search.CaseDocumentsMetadata;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
+import uk.gov.hmcts.ccd.endpoint.exceptions.BadSearchRequest;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ServiceException;
 import uk.gov.hmcts.ccd.v2.external.domain.DocumentHashToken;
 
@@ -57,7 +60,7 @@ public class CaseDocumentAttacher {
 
        extractDocumentsAfterCallBack(caseDetails,callBackWasCalled);
 
-       consolidateDocumentsWithHashTokenAfterCallBack();
+       consolidateDocumentsWithHashTokenAfterCallBack(caseDocumentsMetadata, documentsBeforeCallback, documentsAfterCallback);
 
        if(eventType.equals(EVENT_TYPE)) {
         //find difference between request payload and existing case detail in db
@@ -94,24 +97,29 @@ public class CaseDocumentAttacher {
             }
 
     }
-    public void consolidateDocumentsWithHashTokenAfterCallBack(){
-        consolidateDocumentsWithHashTokenAfterCallBack(caseDocumentsMetadata, documentsBeforeCallback, documentsAfterCallback);
-    }
-    public void restCallToAttachCaseDocuments(){
-        HttpEntity<CaseDocumentsMetadata> requestEntity = new HttpEntity<>(caseDocumentsMetadata, securityUtils.authorizationHeaders());
-        restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
 
-             //if response coming with exception then we have to check documentIds belong to either callback service or user request
+    public void restCallToAttachCaseDocuments() {
+        try {
+            HttpEntity<CaseDocumentsMetadata> requestEntity = new HttpEntity<>(caseDocumentsMetadata, securityUtils.authorizationHeaders());
+
+            restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
+
+            //if response coming with exception then we have to check documentIds belong to either callback service or user request
             //if belong to call back service then throw 500 else 403
-           //call back attempted to change the hashtoken of the following documents {} log error
+            //call back attempted to change the hashtoken of the following documents {} log error
             if (!caseDocumentsMetadata.getDocuments().isEmpty()) {
-                 restTemplate
+                restTemplate
                     .exchange(applicationParams.getCaseDocumentAmApiHost().concat(applicationParams.getAttachDocumentPath()),
                         HttpMethod.PATCH, requestEntity, Void.class);
 
 
             }
+        } catch (HttpClientErrorException restClientException) {
+            if (restClientException.getStatusCode() != HttpStatus.FORBIDDEN) {
+                throw new BadSearchRequest(restClientException.getMessage());
+            }
 
+        }
     }
 
     public void extractDocumentsWithHashTokenBeforeCallback(Map<String, JsonNode> data, Map<String,String> documentMap) {
