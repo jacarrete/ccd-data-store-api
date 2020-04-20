@@ -37,6 +37,7 @@ public class CaseDocumentAttacher {
     Map<String,String> documentsBeforeCallback = null;
     Map<String,String> documentsAfterCallback = null;
     CaseDocumentsMetadata caseDocumentsMetadata = null;
+    Map<String, JsonNode> recursiveMapForCaseDetailsBefore = new HashMap<>();
     public static final String COMPLEX = "Complex";
     public static final String COLLECTION = "Collection";
     public static final String DOCUMENT = "Document";
@@ -245,7 +246,7 @@ public class CaseDocumentAttacher {
         if (null == caseData) {
             return filterDocumentSet;
         }
-
+        //Comparing two jsonNode entities at nested child level
         checkDocumentFieldsDifference(caseDataBefore, caseData, documentsDifference);
         //Find documentId based on filter Map. So that I can filter the DocumentMetaData Object before calling the case document am Api.
         findDocumentsId(documentsDifference,filterDocumentSet);
@@ -265,7 +266,7 @@ public class CaseDocumentAttacher {
                     }
 
                 } else {
-                   Map<String, JsonNode> recursiveMapForCaseDetailsBefore = new HashMap<>();
+
                    Iterator<String> fieldNames = caseBeforeNode[0].fieldNames();
                    while(fieldNames.hasNext()){
                         String   fieldName =  fieldNames.next();
