@@ -16,6 +16,7 @@ import uk.gov.hmcts.ccd.domain.model.definition.CaseDetails;
 import uk.gov.hmcts.ccd.domain.model.search.CaseDocumentsMetadata;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadRequestException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.BadSearchRequest;
+import uk.gov.hmcts.ccd.endpoint.exceptions.ResourceNotFoundException;
 import uk.gov.hmcts.ccd.endpoint.exceptions.ServiceException;
 import uk.gov.hmcts.ccd.v2.external.domain.DocumentHashToken;
 
@@ -118,7 +119,11 @@ public class CaseDocumentAttacher {
             }
         } catch (HttpClientErrorException restClientException) {
             if (restClientException.getStatusCode() != HttpStatus.FORBIDDEN) {
-                throw new BadSearchRequest(restClientException.getMessage());
+                if(restClientException.getStatusCode()==HttpStatus.BAD_REQUEST) {
+                    throw new BadSearchRequest(restClientException.getMessage());
+                }else {
+                    throw new ResourceNotFoundException(restClientException.getMessage());
+                }
             }
 
         }
