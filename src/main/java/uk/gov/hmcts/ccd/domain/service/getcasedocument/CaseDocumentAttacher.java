@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,7 +65,7 @@ public class CaseDocumentAttacher {
 
        if(eventType.equals(EVENT_TYPE)) {
         //find difference between request payload and existing case detail in db
-        final Set<String> filterDocumentSet = differenceBeforeAndAfterInCaseDetails(caseDetailsBefore, caseDetails.getData());
+        final Set<String> filterDocumentSet = differenceBeforeAndAfterInCaseDetails(caseDetailsBefore.getData(), caseDetails.getData());
 
         //to filter the DocumentMetaData based on filterDocumentSet.
         filterDocumentMetaData(filterDocumentSet);
@@ -235,30 +236,55 @@ public class CaseDocumentAttacher {
 
 
     }
-    public Set<String> differenceBeforeAndAfterInCaseDetails(final CaseDetails caseDetails, final Map<String, JsonNode> caseData) {
+    public Set<String> differenceBeforeAndAfterInCaseDetails(final Map<String, JsonNode> caseDataBefore, final Map<String, JsonNode> caseData) {
 
         final Map<String, JsonNode> documentsDifference = new HashMap<>();
+
         final Set<String> filterDocumentSet = new HashSet<>();
 
         if (null == caseData) {
             return filterDocumentSet;
         }
 
-        caseData.forEach((key, value) -> {
-
-            if (caseDetails.getData().containsKey(key) && isDocumentFieldAtAnyLevel(value)) {
-                if(!value.equals(caseDetails.getData().get(key)))
-                {
-                    documentsDifference.put(key,value);
-                }
-            } else if(isDocumentFieldAtAnyLevel(value)){
-                documentsDifference.put(key,value);
-            }
-        });
+        checkDocumentFieldsDifference(caseDataBefore, caseData, documentsDifference);
         //Find documentId based on filter Map. So that I can filter the DocumentMetaData Object before calling the case document am Api.
         findDocumentsId(documentsDifference,filterDocumentSet);
         return filterDocumentSet;
     }
+
+    private void checkDocumentFieldsDifference(Map<String, JsonNode> caseDataBefore, Map<String, JsonNode> caseData, Map<String, JsonNode> documentsDifference) {
+        final JsonNode[] caseBeforeNode = {null};
+        caseData.forEach((key, value) -> {
+
+            if (caseDataBefore.containsKey(key) ) {
+                caseBeforeNode[0] =caseDataBefore.get(key);
+                if (value != null && isDocumentField(value)) {
+                    if(!value.equals(caseDataBefore.get(key)))
+                    {
+                    documentsDifference.put(key,value);
+                    }
+
+                } else {
+                   Map<String, JsonNode> recursiveMapForCaseDetailsBefore = new HashMap<>();
+                   Iterator<String> fieldNames = caseBeforeNode[0].fieldNames();
+                   while(fieldNames.hasNext()){
+                        String   fieldName =  fieldNames.next();
+                        JsonNode before= caseBeforeNode[0].get(fieldName);
+                        recursiveMapForCaseDetailsBefore.put(fieldName,before);
+
+                    }
+
+                    value.fields().forEachRemaining
+                        (node -> checkDocumentFieldsDifference(recursiveMapForCaseDetailsBefore,
+                            Collections.singletonMap(node.getKey(), node.getValue()),documentsDifference));
+                }
+
+            } else if(isDocumentFieldAtAnyLevel(value)){
+                documentsDifference.put(key,value);
+            }
+        });
+    }
+
     private void findDocumentsId(Map<String, JsonNode> sanitisedDataToAttachDoc, Set<String> filterDocumentSet) {
 
         sanitisedDataToAttachDoc.forEach((field, jsonNode) -> {

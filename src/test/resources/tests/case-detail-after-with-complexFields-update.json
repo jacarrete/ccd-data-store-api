@@ -43,7 +43,7 @@
   "ComplexField" : {
     "ComplexTextField" : null,
     "ComplexNestedField" : {
-      "NestedNumberField" : null,
+      "NestedNumberField" : 12335,
       "NestedCollectionTextField" : [ ],
       "DocumentField7" : {
         "document_url": "http://dm-store:8080/documents/8da17150-c001-47d7-bfeb-3dabed9e0976",

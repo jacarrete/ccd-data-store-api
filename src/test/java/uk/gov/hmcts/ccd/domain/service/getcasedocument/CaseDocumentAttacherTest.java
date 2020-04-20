@@ -34,17 +34,14 @@ public class CaseDocumentAttacherTest {
 
     HashMap<String, JsonNode> caseDetailsBefore;
     HashMap<String, JsonNode> caseDataContent;
-    CaseDetails caseDetails;
     Map<String,String> beforeCallBack;
     CaseDocumentsMetadata  caseDocumentsMetadata;
 
     @BeforeEach
     public void setup() throws IOException {
-        MockitoAnnotations.initMocks(this);
-        caseDetails = new CaseDetails();
+         MockitoAnnotations.initMocks(this);
          caseDetailsBefore = buildCaseData("case-detail-before-update.json");
         caseDataContent = buildCaseData("case-detail-after-update.json");
-        caseDetails.setData(caseDetailsBefore);
 
     }
 
@@ -55,7 +52,7 @@ public class CaseDocumentAttacherTest {
         Set<String> expectedOutput = new HashSet();
         expectedOutput.add("8da17150-c001-47d7-bfeb-3dabed9e0976");
 
-        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetails,caseDataContent);
+        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore,caseDataContent);
 
         assertAll(
             () -> assertEquals(output, expectedOutput)
@@ -69,7 +66,21 @@ public class CaseDocumentAttacherTest {
         Set<String> expectedOutput = new HashSet();
         expectedOutput.add("8da17150-c001-47d7-bfeb-3dabed9e0976");
 
-        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetails,caseDataContent);
+        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore,caseDataContent);
+
+        assertAll(
+            () -> assertEquals(output, expectedOutput)
+
+        );
+    }
+
+    @Test
+    @DisplayName("should not return document fields difference in case of non document fields update ")
+    void shouldNotReturnDeltaInCaseOfNonDocumentFieldsUpdate() throws IOException {
+        HashMap<String, JsonNode> caseDataContent = buildCaseData("case-detail-plain-fields-update.json");
+        HashMap<String, JsonNode> caseDetailsBefore = buildCaseData("case-detail-before.json");
+        Set<String> expectedOutput = new HashSet();
+        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore,caseDataContent);
 
         assertAll(
             () -> assertEquals(output, expectedOutput)
@@ -78,12 +89,13 @@ public class CaseDocumentAttacherTest {
     }
 
 
+
     @Test
     @DisplayName("should return empty document set in case of CaseDataContent is empty")
     void shouldReturnEmptyDocumentSet() {
         caseDataContent=null;
         Set<String> expectedOutput = new HashSet();
-        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetails,caseDataContent);
+        final Set<String> output = caseDocumentAttacher.differenceBeforeAndAfterInCaseDetails(caseDetailsBefore,caseDataContent);
 
         assertAll(
             () -> assertEquals(output, expectedOutput)
