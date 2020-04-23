@@ -5,6 +5,7 @@ import static java.util.Arrays.asList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -283,8 +284,15 @@ public class GetCaseDocumentsOperationTest {
     void shouldExtractDocumentFieldsFromCaseDefinition() throws IOException {
 
         List<CaseField>  inputCaseField = new ArrayList<>();
+        List<CaseField>  expectedCaseField = Arrays.asList(CASE_FIELD);
         caseDocumentsOperation.extractDocumentFieldsFromCaseDefinition(caseFieldList,inputCaseField);
-    }
+        assertAll(
+                () -> assertEquals(inputCaseField,expectedCaseField)
+
+                     );
+        }
+
+
 
 
         private Map<String, JsonNode> buildData(String... dataFieldIds) {
