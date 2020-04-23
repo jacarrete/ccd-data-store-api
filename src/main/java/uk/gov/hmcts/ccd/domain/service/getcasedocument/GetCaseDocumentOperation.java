@@ -26,7 +26,9 @@ import uk.gov.hmcts.ccd.v2.external.domain.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -126,11 +128,11 @@ public class GetCaseDocumentOperation {
     }
 
     private Boolean isDocumentPresent(String documentId, JsonNode documentFieldsWithReadPermission) {
-        for (JsonNode jsonNode : documentFieldsWithReadPermission) {
-            if (jsonNode.get(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null
-                && jsonNode.get(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE).asText().contains(documentId)
-                || (jsonNode.get(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) != null
-                && jsonNode.get(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE).asText().contains(documentId))) {
+        Iterator<Map.Entry<String, JsonNode>> documentFieldEntry  = documentFieldsWithReadPermission.fields();
+        while (documentFieldEntry.hasNext()) {
+           Map.Entry<String, JsonNode> documentFiels = documentFieldEntry.next();
+            if((documentFiels.getKey() !=null && (documentFiels.getKey().equals(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) && documentFiels.getValue().asText().contains(documentId) )) ||
+              (documentFiels.getKey() !=null && (documentFiels.getKey().equals(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) && documentFiels.getValue().asText().contains(documentId) ))){
                 return true;
             }
         }
