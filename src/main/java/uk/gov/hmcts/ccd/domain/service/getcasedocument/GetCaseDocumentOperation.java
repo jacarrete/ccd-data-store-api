@@ -137,7 +137,7 @@ public class GetCaseDocumentOperation {
         return false;
     }
 
-    private void extractDocumentFieldsFromCaseDefinition(List<CaseField> complexCaseFieldList, List<CaseField> documentCaseFields) {
+     void extractDocumentFieldsFromCaseDefinition(List<CaseField> complexCaseFieldList, List<CaseField> documentCaseFields) {
         if (complexCaseFieldList != null && !complexCaseFieldList.isEmpty()) {
             for (CaseField caseField : complexCaseFieldList) {
                 switch (caseField.getFieldType().getType()) {
