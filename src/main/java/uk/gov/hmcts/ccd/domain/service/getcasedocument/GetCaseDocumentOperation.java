@@ -128,11 +128,11 @@ public class GetCaseDocumentOperation {
     }
 
     private Boolean isDocumentPresent(String documentId, JsonNode documentFieldsWithReadPermission) {
-        Iterator<Map.Entry<String, JsonNode>> documentFieldEntry  = documentFieldsWithReadPermission.fields();
-        while (documentFieldEntry.hasNext()) {
-           Map.Entry<String, JsonNode> documentFiels = documentFieldEntry.next();
-            if((documentFiels.getKey() !=null && (documentFiels.getKey().equals(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) && documentFiels.getValue().asText().contains(documentId) )) ||
-              (documentFiels.getKey() !=null && (documentFiels.getKey().equals(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) && documentFiels.getValue().asText().contains(documentId) ))){
+        for (JsonNode jsonNode : documentFieldsWithReadPermission) {
+            if ((jsonNode.get(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE) != null
+                && jsonNode.get(DOCUMENT_CASE_FIELD_BINARY_ATTRIBUTE).asText().contains(documentId))
+                || (jsonNode.get(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE) != null
+                && jsonNode.get(DOCUMENT_CASE_FIELD_URL_ATTRIBUTE).asText().contains(documentId))) {
                 return true;
             }
         }
