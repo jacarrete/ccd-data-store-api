@@ -8,9 +8,13 @@ Feature: F-1002: Submit Event for an Existing Case (V2.1)
   Scenario: must successfully update case data content with Id and Token for a new document
 
     Given a user with [an active caseworker profile in CCD with full permissions on a document field],
-    And   a successful call [to upload a document with mandatory metadata] as in [Default_Document_Upload_Data],
-    And   a successful call [to create a token for case creation] as in [Befta_Jurisdiction2_Default_Token_Creation_Data_For_Case_Creation],
-    And another successful call [by same user to create a case of this case type] as in [Befta_Jurisdiction2_Default_Full_Case_Creation_Data],
+    And a successful call [to upload a document with mandatory metadata] as in [Default_Document_Upload_Data],
+    And another successful call [to create a token for case creation] as in [Befta_Jurisdiction2_Default_Token_Creation_Data_For_Case_Creation],
+    And  a request is prepared with appropriate values,
+    And   the request [is to attach the document uploaded above to a new case],
+    And   it is submitted to call the [Submit Case Creation (V3)] operation of [CCD Data Store],
+
+    And another successful call [by same user to create a case of this case type] as in [F-1002-V3-Case_Creation_Data],
     When a request is prepared with appropriate values,
     And the request [contains an Event Id received from upstream],
     And the request [contains a Case Id and Document Id created above],
