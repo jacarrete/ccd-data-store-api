@@ -18,7 +18,7 @@ Feature: F-1002: Submit Event for an Existing Case (V2.1)
     And it is submitted to call the [Submit Event for an Existing Case (V3)] operation of [CCD Data Store],
     Then a positive response is received,
     And the response has all other details as expected,
-    And   a call [to retrieve case details by case id] will get the expected response as in [S-1011_Default_Get_Case_Data_Base].
+    And   a call [to retrieve case details by case id] will get the expected response as in [S-1011_Get_Case_Data_Base].
 
 #  @S-1012
 #  Scenario: must successfully update case data content without any document field

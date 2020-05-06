@@ -1,5 +1,5 @@
 {
-  "_guid_": "S-1011_Default_Get_Case_Data_Base",
+  "_guid_": "S-1011_Get_Case_Data_Base",
   "_extends_": "F-1002-Default_Get_Case_Data_Base",
   "request": {
     "pathVariables": {
@@ -15,13 +15,6 @@
         }
       },
       "id" : "${[scenarioContext][parentContext][testData][actualResponse][body][id]}",
-      "jurisdiction" : "BEFTA_JURISDICTION_2",
-      "case_type" : "BEFTA_CASETYPE_2_1",
-      "created_on" : "[[ANY_TIMESTAMP_NOT_NULLABLE]]",
-      "last_modified_on" : "[[ANY_TIMESTAMP_NOT_NULLABLE]]",
-      "last_state_modified_on" : "[[ANY_TIMESTAMP_NOT_NULLABLE]]",
-      "state" : "TODO",
-      "security_classification" : "PUBLIC",
       "data" : {
         "DocumentField1" : {
           "document_url" : "http://dm-store:8080/documents/${[scenarioContext][parentContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}",
