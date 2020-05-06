@@ -35,7 +35,7 @@
         "summary": "",
         "description": ""
       },
-      "event_token": "${[scenarioContext][childContexts][Befta_Jurisdiction2_Token_For_Update_Case][testData][actualResponse][body][token]}",
+      "event_token": "${[scenarioContext][childContexts][F-1002-V3_Update_Event_Token_Creation][testData][actualResponse][body][token]}",
       "ignore_warning": false,
       "draft_id": null
     }
