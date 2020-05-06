@@ -5,8 +5,7 @@
 
   "specs": [
     "an active caseworker profile in CCD with full permissions on a document field",
-    "contains an Event Id received from upstream",
-    "contains a Case Id and Document Id created above"
+    "contains an Event Id received from upstream"
   ],
 
   "method": "POST",
@@ -20,14 +19,14 @@
   },
 
   "request": {
+    "pathVariables": {
+      "cid": "${[scenarioContext][childContexts][F-1002-V3-Case_Creation_Data][testData][actualResponse][body][id]}"
+    },
     "headers": {
       "Authorization": "[[DEFAULT_AUTO_VALUE]]",
       "ServiceAuthorization": "[[DEFAULT_AUTO_VALUE]]",
       "Content-Type": "application/vnd.uk.gov.hmcts.ccd-data-store-api.create-event.v3+json;charset=UTF-8",
       "experimental": true
-    },
-    "pathVariables": {
-      "cid": "${[scenarioContext][childContexts][F-1002-V3-Case_Creation_Data][testData][actualResponse][body][id]}"
     },
     "body": {
       "data": {

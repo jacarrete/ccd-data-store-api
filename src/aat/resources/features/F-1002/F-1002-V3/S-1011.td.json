@@ -3,6 +3,10 @@
   "_extends_": "F-1002-V3_Test_Base_Request_Body",
   "title": "must successfully update case data content with Id and Token for a new document",
 
+  "specs": [
+    "contains a Case Id and Document Id created above"
+  ],
+
   "request": {
     "body": {
       "data": {
