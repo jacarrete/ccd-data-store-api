@@ -1,11 +1,24 @@
 {
-  "_guid_": "F-1002-V3_Base_Root",
+  "_guid_": "F-1002-V3_Test_Base_Request_Body",
+  "productName": "CCD Data Store",
+  "operationName": "Submit Event for an Existing Case (V3)",
+
+  "specs": [
+    "an active caseworker profile in CCD with full permissions on a document field",
+    "contains an Event Id received from upstream",
+    "contains a Case Id and Document Id created above"
+  ],
+
+  "method": "POST",
+  "uri": "cases/{cid}/events",
+
   "users": {
     "invokingUser": {
       "username": "befta.caseworker.2.solicitor.2@gmail.com",
       "password": "[[$CCD_BEFTA_CASEWORKER_2_SOLICITOR_2_PWD]]"
     }
   },
+
   "request": {
     "headers": {
       "Authorization": "[[DEFAULT_AUTO_VALUE]]",
@@ -18,17 +31,6 @@
     },
     "body": {
       "data": {
-        "DateField": null,
-        "TextField": "A text fields",
-        "EmailField": "a@b.com",
-        "NumberField": "11111",
-
-        "DocumentField1": {
-          "document_url": "http://dm-store:8080/documents/${[scenarioContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}",
-          "document_filename": "${[scenarioContext][childContexts][Default_Document_Upload_Data][testData][actualResponse][body][documents][0][originalDocumentName]}",
-          "document_binary_url": "http://dm-store:8080/documents/${[scenarioContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}/binary",
-          "hashToken": "${[scenarioContext][childContexts][Default_Document_Upload_Data][testData][actualResponse][body][documents][0][hashToken]}"
-        }
       },
       "event": {
         "id": "UPDATE",

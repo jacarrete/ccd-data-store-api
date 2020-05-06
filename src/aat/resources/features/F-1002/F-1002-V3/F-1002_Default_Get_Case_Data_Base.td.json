@@ -98,16 +98,16 @@
         "FixedRadioListField": "RADIOVALUE2",
         "DateTimeField": null,
         "PhoneUKField": null,
-        "NumberField": "11111",
+        "NumberField": "111111222222",
         "MultiSelectListField": [
           "OPTION5",
           "OPTION4",
           "OPTION3"
         ],
         "YesOrNoField": "Yes",
-        "EmailField": "a@b.com",
-        "TextField": "A text fields",
-        "DateField": null,
+        "EmailField": "testemail@gmail.com",
+        "TextField": "sometextfield",
+        "DateField": "2222-01-02",
         "TextAreaField": "textarea",
         "CollectionField": []
       },

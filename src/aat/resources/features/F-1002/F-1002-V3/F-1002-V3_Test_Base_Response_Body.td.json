@@ -27,10 +27,10 @@
         "AddressLine2" : null,
         "AddressLine3" : null
       },
-      "DocumentField1" : {
-        "document_url" : "http://dm-store:8080/documents/${[scenarioContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}",
-        "document_filename" : "${[scenarioContext][childContexts][Default_Document_Upload_Data][testData][actualResponse][body][documents][0][originalDocumentName]}",
-        "document_binary_url" : "http://dm-store:8080/documents/${[scenarioContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}/binary"
+      "DocumentField1": {
+        "document_url": "{{DM_STORE_BASE_URL}}/documents/e636eef3-839a-48cd-96f0-dad43e66f5c4",
+        "document_binary_url": "{{DM_STORE_BASE_URL}}/documents/e636eef3-839a-48cd-96f0-dad43e66f5c4/binary",
+        "document_filename": "Screenshot 2019-11-13 at 3.24.26 pm.png"
       },
       "DocumentField2" : {
         "document_url" : "http://dm-store:8080/documents/ae5c9e4b-1385-483e-b1b7-607e75dd3943",
@@ -73,12 +73,12 @@
       "FixedRadioListField" : "RADIOVALUE2",
       "DateTimeField" : null,
       "PhoneUKField" : null,
-      "NumberField" : "11111",
+      "NumberField" : "111111222222",
       "MultiSelectListField" : [ "OPTION5", "OPTION4", "OPTION3" ],
       "YesOrNoField" : "Yes",
-      "EmailField" : "a@b.com",
-      "TextField" : "A text fields",
-      "DateField" : null,
+      "EmailField" : "testemail@gmail.com",
+      "TextField" : "sometextfield",
+      "DateField" : "2222-01-02",
       "TextAreaField" : "textarea",
       "CollectionField" : [ ]
     },

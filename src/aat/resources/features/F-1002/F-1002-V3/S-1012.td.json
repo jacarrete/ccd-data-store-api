@@ -1,0 +1,10 @@
+{
+  "_guid_": "S-1012",
+  "_extends_": "F-1002-V3_Test_Base_Request_Body",
+  "title": "must successfully update case data content without any document field",
+
+
+  "expectedResponse": {
+    "_extends_": "F-1002-V3_Test_Base_Response_Body"
+  }
+}
