@@ -4,7 +4,7 @@
   "body": {
     "_links" : {
       "self" : {
-        "href" : "{{TEST_URL}}/case-types/BEFTA_CASETYPE_2_1/cases{?ignore-warning}"
+        "href" : "{{TEST_URL}}/cases/${[scenarioContext][childContexts][F-1002-V3-Case_Creation_Data][testData][actualResponse][body][id]}/events"
       }
     },
     "id" : "[[ANYTHING_PRESENT]]",
@@ -16,8 +16,8 @@
     "state" : "TODO",
     "security_classification" : "PUBLIC",
     "data" : {
-      "MoneyGBPField" : null,
-      "FixedListField" : "VALUE2",
+      "MoneyGBPField" : "111100",
+      "FixedListField" : "VALUE3",
       "AddressUKField" : {
         "County" : null,
         "Country" : null,
@@ -29,27 +29,57 @@
       },
       "DocumentField1" : {
         "document_url" : "http://dm-store:8080/documents/${[scenarioContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}",
-        "document_filename" : "${[scenarioContext][childContexts][Default_Document_Upload_Data][testData][actualResponse][body][_embedded][documents][0][originalDocumentName]}",
+        "document_filename" : "${[scenarioContext][childContexts][Default_Document_Upload_Data][testData][actualResponse][body][documents][0][originalDocumentName]}",
         "document_binary_url" : "http://dm-store:8080/documents/${[scenarioContext][childContexts][Default_Document_Upload_Data][customValues][documentIdInTheResponse]}/binary"
       },
+      "DocumentField2" : {
+        "document_url" : "http://dm-store:8080/documents/ae5c9e4b-1385-483e-b1b7-607e75dd3943",
+        "document_filename" : "Elastic Search test Case.png",
+        "document_binary_url" : "http://dm-store:8080/documents/ae5c9e4b-1385-483e-b1b7-607e75dd3943/binary"
+      },
+      "DocumentField3" : {
+        "document_url" : "http://dm-store:8080/documents/68c9f85f-1d0c-4d02-b082-502a87c1ac6c",
+        "document_filename" : "Screenshot 2019-11-13 at 9.52.02 am.png",
+        "document_binary_url" : "http://dm-store:8080/documents/68c9f85f-1d0c-4d02-b082-502a87c1ac6c/binary"
+      },
+      "DocumentField4" : {
+        "document_url" : "http://dm-store:8080/documents/e56f0aea-4a5f-46d5-82d3-01b536420870",
+        "document_filename" : "Screenshot 2019-11-14 at 1.57.32 pm.png",
+        "document_binary_url" : "http://dm-store:8080/documents/e56f0aea-4a5f-46d5-82d3-01b536420870/binary"
+      },
+      "DocumentField5" : {
+        "document_url" : "http://dm-store:8080/documents/f96735a6-8764-4778-978c-e7612a610a94",
+        "document_filename" : "Screenshot 2019-11-18 at 10.20.24 am.png",
+        "document_binary_url" : "http://dm-store:8080/documents/f96735a6-8764-4778-978c-e7612a610a94/binary"
+      },
+      "DocumentField6" : {
+        "document_url" : "http://dm-store:8080/documents/76976634-374f-472b-a819-a3a938b4cc83",
+        "document_filename" : "Screenshot 2019-11-13 at 11.25.45 am.png",
+        "document_binary_url" : "http://dm-store:8080/documents/76976634-374f-472b-a819-a3a938b4cc83/binary"
+      },
+      "DocumentField7" : {
+        "document_url" : "http://dm-store:8080/documents/5c14f8ef-887b-41e0-ad01-23959c082311",
+        "document_filename" : "Screenshot 2019-12-24 at 3.41.04 pm.png",
+        "document_binary_url" : "http://dm-store:8080/documents/5c14f8ef-887b-41e0-ad01-23959c082311/binary"
+      },
       "ComplexField" : {
-        "ComplexTextField" : "aefaefa",
+        "ComplexTextField" : null,
         "ComplexNestedField" : {
           "NestedNumberField" : null,
           "NestedCollectionTextField" : [ ]
         },
-        "ComplexFixedListField" : "VALUE2"
+        "ComplexFixedListField" : null
       },
-      "FixedRadioListField" : "RADIOVALUE3",
+      "FixedRadioListField" : "RADIOVALUE2",
       "DateTimeField" : null,
-      "PhoneUKField" : "08888899999",
+      "PhoneUKField" : null,
       "NumberField" : "11111",
       "MultiSelectListField" : [ "OPTION5", "OPTION4", "OPTION3" ],
-      "YesOrNoField" : "No",
+      "YesOrNoField" : "Yes",
       "EmailField" : "a@b.com",
       "TextField" : "A text fields",
       "DateField" : null,
-      "TextAreaField" : "fqeadadfTSFGsfs`f`sfs`f",
+      "TextAreaField" : "textarea",
       "CollectionField" : [ ]
     },
     "data_classification" : {
@@ -68,6 +98,12 @@
         }
       },
       "DocumentField1" : "PUBLIC",
+      "DocumentField2" : "PUBLIC",
+      "DocumentField3" : "PUBLIC",
+      "DocumentField4" : "PUBLIC",
+      "DocumentField5" : "PUBLIC",
+      "DocumentField6" : "PUBLIC",
+      "DocumentField7" : "PUBLIC",
       "FixedRadioListField" : "PUBLIC",
       "DateTimeField" : "PUBLIC",
       "PhoneUKField" : "PUBLIC",
